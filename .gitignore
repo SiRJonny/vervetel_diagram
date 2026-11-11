@@ -1,0 +1,6 @@
+# Sample patient data — never committed (GDPR Art. 9)
+example_data/
+
+__pycache__/
+*.pyc
+node_modules/
