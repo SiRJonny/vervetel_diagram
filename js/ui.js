@@ -2,6 +2,7 @@
 // Mobile (<=820px): same elements become a horizontal chip scroller (CSS).
 
 import { analyteColor, analyteLabel, GROUPS, analyteGroup } from "./normalize.js";
+import { analyteDescription } from "./descriptions.js";
 import { getSetting, setSetting } from "./storage.js";
 
 const DEFAULT_VISIBLE = new Set(["hemoglobin"]);
@@ -17,6 +18,67 @@ export function saveSelection(visible) {
   for (const id of visible) obj[id] = true;
   return setSetting("selection", obj);
 }
+
+// One shared hover popup for all (i) buttons, fixed-positioned so scroll
+// containers (mobile chip scroller) can't clip it.
+let infoPopup = null;
+let infoPopupFor = null;
+
+function showInfo(btn, id) {
+  const desc = analyteDescription(id);
+  if (!desc) return;
+  if (!infoPopup) {
+    infoPopup = document.createElement("div");
+    infoPopup.className = "info-popup";
+    document.body.appendChild(infoPopup);
+  }
+  const name = btn.dataset.name || "";
+  infoPopup.innerHTML = "";
+  if (name) {
+    const t = document.createElement("strong");
+    t.textContent = name;
+    infoPopup.appendChild(t);
+  }
+  const p = document.createElement("p");
+  p.textContent = desc;
+  infoPopup.appendChild(p);
+  const src = document.createElement("span");
+  src.className = "info-src";
+  src.textContent = "Forrás: Wikipédia";
+  infoPopup.appendChild(src);
+
+  const r = btn.getBoundingClientRect();
+  const above = r.top > 240;
+  infoPopup.classList.toggle("above", above);
+  // measure after content, then clamp horizontally to the viewport
+  const w = Math.min(320, window.innerWidth - 16);
+  const x = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+  infoPopup.style.left = x + "px";
+  infoPopup.style.top = above ? "" : r.bottom + 8 + "px";
+  infoPopup.style.bottom = above ? window.innerHeight - r.top + 8 + "px" : "";
+  infoPopup.style.width = w + "px";
+  infoPopup.hidden = false;
+  infoPopupFor = btn;
+}
+
+function hideInfo() {
+  if (infoPopup) infoPopup.hidden = true;
+  infoPopupFor = null;
+}
+
+// Close the popup on scroll / click elsewhere / Escape.
+window.addEventListener("scroll", () => {
+  if (infoPopup && !infoPopup.hidden) {
+    if (infoPopupFor) showInfo(infoPopupFor, infoPopupFor.dataset.id);
+  }
+}, true);
+window.addEventListener("click", (e) => {
+  if (infoPopup && !infoPopup.hidden && !infoPopup.contains(e.target)
+      && !(infoPopupFor && infoPopupFor.contains(e.target))) hideInfo();
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") hideInfo();
+});
 
 /**
  * Render the analyte list, grouped by lab panel.
@@ -86,7 +148,31 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
       const text = document.createElement("span");
       text.textContent = analyteLabel(id);
 
-      label.append(cb, dot, text);
+      // (i) info button — hover/click opens a short Wikipedia-based summary
+      const info = document.createElement("button");
+      info.type = "button";
+      info.className = "info";
+      info.textContent = "i";
+      info.dataset.id = id;
+      info.dataset.name = analyteLabel(id);
+      info.title = "Rövid leírás";
+      info.setAttribute("aria-label", `${analyteLabel(id)} leírása`);
+      info.addEventListener("mouseenter", () => showInfo(info, id));
+      info.addEventListener("mouseleave", () => {
+        if (infoPopupFor === info) hideInfo();
+      });
+      info.addEventListener("focus", () => showInfo(info, id));
+      info.addEventListener("blur", () => {
+        if (infoPopupFor === info) hideInfo();
+      });
+      info.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (infoPopupFor === info && infoPopup && !infoPopup.hidden) hideInfo();
+        else showInfo(info, id);
+      });
+
+      label.append(cb, dot, text, info);
       group.appendChild(label);
     }
     container.appendChild(group);

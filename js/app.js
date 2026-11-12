@@ -1,6 +1,6 @@
 // app.js — wiring. Local only: no network requests after page load.
 
-import { loadAllRows, exportJSON } from "./storage.js";
+import { loadAllRows, exportJSON, clearAll } from "./storage.js";
 import { importFiles } from "./import.js";
 import { buildSeries, renderChart, setEmptyState } from "./chart-render.js";
 import { loadSelection, saveSelection, renderAnalyteList, setStatus } from "./ui.js";
@@ -77,6 +77,21 @@ document.getElementById("unselect-all").addEventListener("click", async () => {
   await saveSelection(visible);
   await refresh();
   setStatus("Selection cleared.");
+});
+
+// Wipes the local IndexedDB (results + settings). Irreversible — the browser
+// copy is gone; re-import PDFs or import a JSON export to restore.
+document.getElementById("delete-data").addEventListener("click", async () => {
+  const ok = window.confirm(
+    "Delete ALL locally stored measurements and settings?\n\n"
+    + "This only clears this browser's database — nothing is uploaded anywhere. "
+    + "Export first if you want a local backup."
+  );
+  if (!ok) return;
+  await clearAll();
+  visible.clear();
+  await refresh();
+  setStatus("All local data deleted.");
 });
 
 document.getElementById("toggle-detail").addEventListener("click", (e) => {

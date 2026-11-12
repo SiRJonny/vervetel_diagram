@@ -109,6 +109,9 @@ main {
 }
 .btn.small:hover { border-color: var(--accent); color: var(--accent); }
 
+.btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+.btn.danger:hover { background: var(--danger); color: var(--bg); }
+
 #analyte-panel h2 {
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -136,6 +139,44 @@ main {
   flex: none;
 }
 .analyte.unavailable { opacity: 0.4; pointer-events: none; }
+.analyte.unavailable .info { pointer-events: auto; }
+
+.info {
+  margin-left: auto;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-edge);
+  background: transparent;
+  color: var(--muted);
+  font: italic 600 0.62rem/1 Georgia, serif;
+  cursor: help;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.info:hover, .info:focus-visible { border-color: var(--accent); color: var(--accent); }
+
+.info-popup {
+  position: fixed;
+  z-index: 50;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  max-height: 40vh;
+  overflow-y: auto;
+  pointer-events: none; /* hover-only: never steals the pointer */
+}
+.info-popup strong { display: block; margin-bottom: 0.25rem; }
+.info-popup p { margin: 0 0 0.3rem; line-height: 1.45; }
+.info-popup .info-src { font-size: 0.68rem; color: var(--muted); }
+.info-popup[hidden] { display: none; }
 
 .group { margin-bottom: 0.6rem; }
 .group:last-child { margin-bottom: 0; }
