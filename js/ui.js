@@ -49,9 +49,10 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
     h.title = "Click to toggle the whole group";
     h.addEventListener("click", () => {
       const ids = items.map(([id]) => id);
-      const allOn = ids.every((id) => visible.has(id));
+      // toggle: select all plottable if none/partial selected, else clear
+      const anyOn = ids.some((id) => visible.has(id));
       for (const id of ids) {
-        if (allOn) visible.delete(id);
+        if (anyOn) visible.delete(id);
         else if (analytes.get(id).plottable) visible.add(id);
       }
       onChange(visible);
