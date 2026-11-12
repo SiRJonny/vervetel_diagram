@@ -141,6 +141,11 @@ export function renderChart(canvas, series) {
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
 
+  // x ticks only at actual datapoint dates (union across visible series)
+  const pointDates = [...new Set(
+    series.flatMap((s) => s.points.map((p) => p.x)),
+  )].sort((a, b) => a - b);
+
   // Reserve space on the right so the interval labels never get clipped.
   const maxLabelLen = Math.max(10, ...labels.map((l) => l.text.length));
   const rightPad = Math.min(200, Math.max(96, Math.round(maxLabelLen * 7.2) + 18));
@@ -164,7 +169,11 @@ export function renderChart(canvas, series) {
             callback: (v) => isoDate(v),
             maxRotation: 0,
             autoSkip: true,
-            maxTicksLimit: 8,
+            maxTicksLimit: 12,
+          },
+          // place a tick at every datapoint date, no dates in between
+          afterBuildTicks: (axis) => {
+            axis.ticks = pointDates.map((v) => ({ value: v }));
           },
           grid: { color: "rgba(43,50,62,0.6)" },
         },
