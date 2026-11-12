@@ -149,30 +149,30 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
       text.textContent = analyteLabel(id);
 
       // (i) info button — hover/click opens a short Wikipedia-based summary
-      const info = document.createElement("button");
-      info.type = "button";
-      info.className = "info";
-      info.textContent = "i";
-      info.dataset.id = id;
-      info.dataset.name = analyteLabel(id);
-      info.title = "Rövid leírás";
-      info.setAttribute("aria-label", `${analyteLabel(id)} leírása`);
-      info.addEventListener("mouseenter", () => showInfo(info, id));
-      info.addEventListener("mouseleave", () => {
-        if (infoPopupFor === info) hideInfo();
+      const infoBtn = document.createElement("button");
+      infoBtn.type = "button";
+      infoBtn.className = "info";
+      infoBtn.textContent = "i";
+      infoBtn.dataset.id = id;
+      infoBtn.dataset.name = analyteLabel(id);
+      infoBtn.title = "Rövid leírás";
+      infoBtn.setAttribute("aria-label", `${analyteLabel(id)} leírása`);
+      infoBtn.addEventListener("mouseenter", () => showInfo(infoBtn, id));
+      infoBtn.addEventListener("mouseleave", () => {
+        if (infoPopupFor === infoBtn) hideInfo();
       });
-      info.addEventListener("focus", () => showInfo(info, id));
-      info.addEventListener("blur", () => {
-        if (infoPopupFor === info) hideInfo();
+      infoBtn.addEventListener("focus", () => showInfo(infoBtn, id));
+      infoBtn.addEventListener("blur", () => {
+        if (infoPopupFor === infoBtn) hideInfo();
       });
-      info.addEventListener("click", (e) => {
+      infoBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (infoPopupFor === info && infoPopup && !infoPopup.hidden) hideInfo();
-        else showInfo(info, id);
+        if (infoPopupFor === infoBtn && infoPopup && !infoPopup.hidden) hideInfo();
+        else showInfo(infoBtn, id);
       });
 
-      label.append(cb, dot, text, info);
+      label.append(cb, dot, text, infoBtn);
       group.appendChild(label);
     }
     container.appendChild(group);
