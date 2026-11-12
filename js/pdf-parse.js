@@ -78,8 +78,9 @@ function hasUnbalancedClose(text) {
 }
 
 function isUnitLike(token) {
-  // Unicode-aware: units may contain Hungarian letters (mm/óra)
-  return /^[A-Za-zµ°%][\p{L}\p{M}\d%/².]*$/u.test(token)
+  // Unicode-aware: units may contain Hungarian letters (mm/óra).
+  // "/HPF", "/LPF" style sediment units start with a slash.
+  return /^[\/A-Za-zµ°%][\p{L}\p{M}\d%/².]*$/u.test(token)
     && /[A-Za-zµ°%]/.test(token);
 }
 

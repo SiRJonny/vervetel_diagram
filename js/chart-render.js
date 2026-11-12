@@ -35,37 +35,29 @@ export function buildSeries(rows, visibleIds) {
   const series = [];
   for (const [id, allRows] of byAnalyte) {
     // unit guard: drop rows whose unit contradicts the analyte (e.g. urine
-    // sediment "/HPF" rows in reports stored before the import-side check)
-    const list = allRows.filter((r) => unitAllowed(id, r.unit));
+    // sediment "/HPF" rows in reports stored before the import-side check).
+    // Unitless rows are kept only when the analyte has no unit-bearing rows.
+    const unitRows = allRows.filter((r) => unitAllowed(id, r.unit));
+    const hasUnits = unitRows.some((r) => r.unit);
+    const list = hasUnits ? unitRows.filter((r) => r.unit) : unitRows;
     if (!list.length) continue;
     // reference interval from the most recent row
     const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const latest = sorted[sorted.length - 1];
 
-    // effective ref pair for a row: own values, else the latest row's,
-    // with the 0-min fallback for one-sided references
-    const latestLo = latest.refLowN, latestHi = latest.refHighN;
-    const eff = (row) => {
-      let lo = row.refLowN ?? latestLo;
-      let hi = row.refHighN ?? latestHi;
-      if (lo === null && hi !== null) lo = 0;
-      return [lo, hi];
-    };
-
-    let [sLo, sHi] = eff(latest);
+    // latest reference interval, applied to ALL points of the series;
+    // 0-min fallback for one-sided references ("< x")
+    let sLo = latest.refLowN, sHi = latest.refHighN;
+    if (sLo === null && sHi !== null) sLo = 0;
     if (sLo === null || sHi === null || sHi <= sLo) continue; // not plottable
 
-    const y = (v, lo, hi) => BAND_LOW + ((v - lo) / (hi - lo)) * (BAND_HIGH - BAND_LOW);
+    const y = (v) => BAND_LOW + ((v - sLo) / (sHi - sLo)) * (BAND_HIGH - BAND_LOW);
     const points = sorted
-      .map((r) => {
-        let [lo, hi] = eff(r);
-        if (lo === null || hi === null || hi <= lo) [lo, hi] = [sLo, sHi];
-        return {
-          x: Date.parse(r.date),
-          y: Math.min(1, Math.max(0, y(r.value, lo, hi))),
-          raw: r,
-        };
-      })
+      .map((r) => ({
+        x: Date.parse(r.date),
+        y: Math.min(1, Math.max(0, y(r.value))),
+        raw: r,
+      }))
       .filter((p) => !Number.isNaN(p.x))
       .sort((a, b) => a.x - b.x);
     if (!points.length) continue;
@@ -143,7 +135,8 @@ export function renderChart(canvas, series) {
     pointHoverRadius: 6,
     borderWidth: 2,
     tension: 0.15,
-    pointStyle: s.mixedUnits ? "triangle" : "circle",
+    pointStyle: "circle",
+    series: s, // tooltip reads the series-level (latest) reference
   }));
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
@@ -188,8 +181,8 @@ export function renderChart(canvas, series) {
             title: (items) => isoDate(items[0].parsed.x),
             label: (item) => {
               const raw = item.raw.raw;
-              const ref = raw.refLowN !== null && raw.refHighN !== null
-                ? ` (ref ${fmt(raw.refLowN)}–${fmt(raw.refHighN)})` : "";
+              const s = item.dataset.series;
+              const ref = s ? ` (ref ${s.refLabel})` : "";
               return `${raw.analyteLabel}: ${raw.bound}${fmt(raw.value)} ${raw.unit || ""}${ref}`;
             },
           },
