@@ -1,4 +1,4 @@
-// normalize.js — map lab-specific test names and units to canonical analytes.
+﻿// normalize.js — map lab-specific test names and units to canonical analytes.
 // No network. Pure functions.
 
 export function stripAccents(s) {
@@ -14,12 +14,17 @@ function low(s) {
 const ANALYTES = [
   ["hdl", "HDL koleszterin", [/\b(hdl|hdl koleszterin)\b/]],
   ["ldl", "LDL koleszterin", [/\b(ldl|ldl koleszterin)\b/]],
+  // HbA1c must be matched before plain hemoglobin
+  ["hba1c-ifcc", "HbA1c (mmol/mol)", [
+    /\bhemoglobin a1c\s*\(ifcc\)/, /\bhemoglobin a1c-ifcc\b/]],
+  ["hba1c-pct", "HbA1c %", [/\bhemoglobin a1c\s*%/]],
   ["hemoglobin", "Hemoglobin", [/\bhemoglobin\b/, /\bhb\b/]],
   ["leukocytes", "Fehérvérsejt", [
-    /\bfehervarsejt(szam|szamzam|szabszam)?\b/, /\bfehervarsejt \(abszolut\)\b/,
-    /\bwbc\b/, /\bleukocita\b/]],
+    /\bfeherversejt(szam|szamzam|szabszam)?\b/, /\bfeherversejt szam\b/,
+    /\bfeherversejt \(abszolut\)\b/, /\bwbc\b/, /\bleukocita\b/]],
   ["erythrocytes", "Vörösvérsejt", [
-    /\bvorosversejt(szam)?\b/, /\bvorosvertest\b/, /\brbc\b/]],
+    /\bvorosversejt(szam)?\b/, /\bvorosvertest\b/, /\bvorosvertest szam\b/,
+    /\brbc\b/]],
   ["hematocrit", "Hematokrit", [/\bhematokrit\b/, /\bhct\b/]],
   ["mcv", "MCV", [/\bmcv\b/]],
   ["mch", "MCH", [/\bmch\b/]],
@@ -27,31 +32,36 @@ const ANALYTES = [
   ["rdw", "RDW-CV", [/\brdw-cv\b/, /\brdw\b/]],
   ["mpv", "MPV", [/\bmpv\b/]],
   ["thrombocytes", "Trombocita", [
-    /\btrombocita(szam)?\b/, /\bplt\b/, /\btrombocitaszam\b/]],
+    /\btrombocita(szam)?\b/, /\btrombocita szam\b/, /\bthrombocyta( szam)?\b/,
+    /\bplt\b/]],
   ["neutrophil-abs", "Neutrofil (absz.)", [
-    /\bneutrofil granulocita #/, /\bneutrofil \(abszolut\)/]],
+    /\bneutrofil granulocita #/, /\bneutrofil \(abszolut\)/,
+    /\bneutrophil gran\.? ?#/]],
   ["lymphocyte-abs", "Limfocita (absz.)", [
-    /\blimfocita #/, /\blimfocita \(abszolut\)/]],
+    /\blimfocita #/, /\blimfocita \(abszolut\)/, /\blymphocyta ?#/]],
   ["monocyte-abs", "Monocita (absz.)", [
-    /\bmonocita #/, /\bmonocita \(abszolut\)/]],
+    /\bmonocita #/, /\bmonocita \(abszolut\)/, /\bmonocyta ?#/]],
   ["eosinophil-abs", "Eozinofil (absz.)", [
-    /\beozinofil granulocita #/, /\beozinofil \(abszolut\)/]],
+    /\beozinofil granulocita #/, /\beozinofil \(abszolut\)/,
+    /\beosinophil gran\.? ?#/]],
   ["basophil-abs", "Bazofil (absz.)", [
-    /\bbazofil granulocita #/, /\bbazofil \(abszolut\)/]],
+    /\bbazofil granulocita #/, /\bbazofil \(abszolut\)/,
+    /\bbasophil gran\.? ?#/]],
   ["neutrophil-pct", "Neutrofil %", [
-    /\bneutrofil granulocita %/, /^neutrofil %? \d/]],
-  ["lymphocyte-pct", "Limfocita %", [/\blimfocita %/]],
-  ["monocyte-pct", "Monocita %", [/\bmonocita %/]],
-  ["eosinophil-pct", "Eozinofil %", [/\beozinofil granulocita %/]],
-  ["basophil-pct", "Bazofil %", [/\bbazofil granulocita %/]],
+    /\bneutrofil granulocita %/, /\bneutrophil gran\.? ?%/]],
+  ["lymphocyte-pct", "Limfocita %", [/\blimfocita %/, /\blymphocyta ?%/]],
+  ["monocyte-pct", "Monocita %", [/\bmonocita %/, /\bmonocyta ?%/]],
+  ["eosinophil-pct", "Eozinofil %", [
+    /\beozinofil granulocita %/, /\beosinophil gran\.? ?%/]],
+  ["basophil-pct", "Bazofil %", [/\bbazofil granulocita %/, /\bbasophil gran\.? ?%/]],
   ["sodium", "Nátrium", [/\b(natrium|serum na)\b/]],
   ["potassium", "Kálium", [/\b(kalium|serum k)\b/]],
-  ["calcium", "Kalcium", [/\b(serum ca|kalcium)\b/]],
+  ["calcium", "Kalcium", [/\b(serum ca|kalcium|kalzium)\b/]],
   ["magnesium", "Magnézium", [/\b(serum mg|magnezium)\b/]],
   ["asat", "GOT (ASAT)", [/\bgot \(asat\)/, /\basat\b/]],
   ["alat", "GPT (ALAT)", [/\bgpt \(alat\)/, /\balat\b/]],
   ["ggt", "Gamma GT", [/\bgamma gt\b/]],
-  ["cholesterol", "Koleszterin", [/\bkoleszterin\b/]],
+  ["cholesterol", "Koleszterin", [/\b(ossz koleszterin|koleszterin)\b/]],
   ["triglycerides", "Triglicerid", [/\btrigliceride?k?\b/]],
   ["creatinine", "Kreatinin", [/\bkreatinin\b/]],
   ["egfr", "eGFR", [/\begfr\b/]],
@@ -61,10 +71,17 @@ const ANALYTES = [
   ["bilirubin-direct", "Direkt/konjug. bilirubin", [
     /\bdirekt bilirubin\b/, /\bkonjugalt bilirubin\b/]],
   ["glucose", "Glükóz", [/\bglukoz\b/]],
-  ["crp", "CRP", [/\bc reaktiv protein\b/, /\bcrp\b/]],
+  ["crp", "CRP", [/\bc reaktiv protein\b/, /\bcrp\b/, /\bhs-crp\b/]],
   ["albumin", "Albumin", [/\balbumin\b/]],
   ["total-protein", "Összfehérje", [/\bosszfeherje\b/]],
-  ["iron", "Vas (Fe)", [/\bvas \(fe\)\b/, /\bserum vas\b/]],
+  ["iron", "Vas (Fe)", [/\bvas \(fe\)\b/, /\bserum vas\b/, /\bvas\b/]],
+  ["tibc", "Transzferrin kapacitás", [/\bteljes vaskoto kapacitas\b/, /\btibc\b/]],
+  ["transferrin", "Transzferrin", [/\btranszferrin\b/]],
+  ["tfsat", "Transzferrin szaturáció", [/\btranszferrin szaturacio\b/]],
+  ["ferritin", "Ferritin", [/\bferritin\b/]],
+  ["amylase", "Amiláz", [/\bamilaz\b/]],
+  ["ck", "Kreatin kináz", [/\bkreatin kinaz\b/, /\bck\b/]],
+  ["psa", "PSA", [/\bprosztata specifikus antig\b/, /\bpsa\b/]],
   ["tsh", "TSH", [/\btireoidea stimulalo hormon\b/, /\btsh\b/]],
   ["alp", "Alkalikus foszfatáz", [/\balkalikus foszfataz\b/]],
   ["ldh", "LDH", [/\blaktat dehidrogenaz\b/, /\bldh\b/]],
@@ -76,6 +93,7 @@ const UNIT_MAP = [
   [/^giga\/l$/i, "G/L"],
   [/^tera\/l$/i, "T/L"],
   [/^umol\/l$/i, "µmol/L"],
+  [/^ug\/l$/i, "µg/L"],
   [/^ml\/perc/i, "mL/min"],
   [/^mm\/(ora|óra)$/i, "mm/h"],
   [/^giga$/i, "G/L"],

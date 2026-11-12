@@ -26,14 +26,15 @@ const SECTION_TRAILING_RE = new RegExp(
   `\\s+[${CAPS}][${CAPS}0-9]+(?:\\s+[${CAPS}][${CAPS}0-9]+)*$`);
 
 const FOOTER_KEYWORDS = [
-  "átváltás", "változás", "labor", "leletnyomtatás", "oldal:",
-  "synlab", "azonosító", "validál", "akkredit", "orvos", "információ",
+  "átváltás", "változás", "labor", "leletnyomtatás", "oldal",
+  "synlab", "azonosító", "validálta", "validálók", "akkredit", "orvos", "információ",
   "taj", "mintavétel", "rögzítés", "lakcím", "beküld", "szakmai",
   "ügyfélszolgálat", "www.", "https", "automata mikroszkópos",
   "számolható", "mikroliter", "ellenőrizve", "amennyiben",
   "módszer", "hiteles", "kezelőorvos", "vizsgálat eredmény",
   "budapest", "ajka", "székesfehérvár", "dunaújváros", "kiskunhalas",
   "weiss manfréd", "korányi", "seregélyesi", "monszpart", "vizelet általános",
+  "megj.", "eeszt", "renderel", "létrehozás", "kiadás", "generált",
 ];
 
 // ---------------------------------------------------------------- helpers --
@@ -260,6 +261,99 @@ function parseSynlab(lines) {
   return rows;
 }
 
+// ---------------------------------------------------------------- EESZT ----
+// EESZT/Corden LOINC table rows, e.g.
+//   3 718-7 Hemoglobin 151.00 g/L 136.00 - 177.00 g/L VALIDÁLT
+//   24 Transzferrin 2.0 g/L 2.0 - 3.6 g/L VALIDÁLT
+//   27 Glüköz reggeli előtt 4.92 mmol/L VALIDÁLT          (no reference)
+
+const EESZT_DATE_RE =
+  /(?:Ellátás|Mintavétel) időpontja:\s*(\d{4}\.\d{2}\.\d{2})/;
+const LOINC_RE = /^\d{2,7}-\d$/;
+const ORDINAL_RE = /^\d{1,3}$/;
+const EESZT_SECTIONS = new Set([
+  "teljes vérkép", "általános vizelet vizsgálat", "vizelet ülédék",
+  "általános laboratóriumi lelet",
+]);
+const EESZT_FLAGS = new Set(["alacsony", "magas"]);
+
+function parseEeszt(lines) {
+  let date = "";
+  const rows = [];
+  let pendingName = "";
+  let tableStarted = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    // only collect rows below the "LOINC Vizsgálat Eredmény ..." header
+    if (!tableStarted) {
+      if (/loinc/i.test(line) && /eredmény/i.test(line)) tableStarted = true;
+      const dm = EESZT_DATE_RE.exec(line);
+      if (dm) date = dm[1].replace(/\./g, "-");
+      continue;
+    }
+    const dm = EESZT_DATE_RE.exec(line);
+    if (dm) { date = dm[1].replace(/\./g, "-"); continue; }
+    if (isFooter(line)) continue;
+    let tokens = line.split(/\s+/);
+
+    // section headers between row blocks
+    if (tokens.length <= 5
+        && EESZT_SECTIONS.has(tokens.join(" ").toLowerCase())) {
+      pendingName = "";
+      continue;
+    }
+
+    // strip leading ordinal number and optional LOINC code
+    if (tokens.length && ORDINAL_RE.test(tokens[0])) tokens = tokens.slice(1);
+    if (tokens.length && LOINC_RE.test(tokens[0])) tokens = tokens.slice(1);
+    if (!tokens.length) continue;
+
+    // "eGFR 90 felett VALIDÁLT": reference only, no result — drop the row
+    if (tokens.length >= 2 && tokens[tokens.length - 1] === "felett"
+        && NUM_RE.test(tokens[tokens.length - 2])) {
+      continue;
+    }
+
+    // locate result: first bare number token
+    const idx = tokens.findIndex((t) => NUM_RE.test(t));
+    if (idx === -1) {
+      // wrapped name fragment (skip balanced-paren noise like "kód (Validáló)")
+      if (tokens.length <= 6
+          && (!line.includes("(") || hasUnbalancedClose(line))) {
+        if (hasUnbalancedClose(line) && rows.length) {
+          rows[rows.length - 1].test += " " + line;
+        } else {
+          pendingName = (pendingName + " " + line).trim();
+        }
+      }
+      continue;
+    }
+
+    const name = joinName(pendingName, tokens.slice(0, idx).join(" ").trim());
+    pendingName = "";
+    const result = toNum(tokens[idx]);
+    const after = tokens.slice(idx + 1);
+    // strip trailing status word
+    while (after.length && /^(valid|validált)$/i.test(after[after.length - 1])) {
+      after.pop();
+    }
+    let flag = "";
+    if (after.length && EESZT_FLAGS.has(after[after.length - 1])) {
+      flag = after.pop();
+    }
+    let unit = "";
+    if (after.length && isUnitLike(after[0])) {
+      unit = after.shift();
+    }
+    // reference may repeat the unit ("136.00 - 177.00 g/L")
+    if (after.length && isUnitLike(after[after.length - 1])) after.pop();
+    const refText = cleanRefText(after);
+    rows.push(makeRow(date, name, result, unit, refText, flag, false));
+  }
+  return rows;
+}
+
 // ------------------------------------------------------------- text layer --
 
 // Rebuild visual text lines from pdf.js text items (grouped by y, sorted
@@ -268,8 +362,8 @@ function extractLines(textContent) {
   const items = textContent.items;
   const lines = [];
   for (const it of items) {
-    const y = Math.round(it.transform[5] / 2) * 2;
-    let line = lines.find((l) => Math.abs(l.y - y) <= 1);
+    const y = Math.round(it.transform[5] * 2) / 2;
+    let line = lines.find((l) => Math.abs(l.y - y) <= 3);
     if (!line) {
       line = { y, parts: [] };
       lines.push(line);
@@ -300,8 +394,11 @@ export async function parsePdfFile(arrayBuffer, fileName) {
     if (i === 1) firstPage = extractLines(tc).join("\n");
     allLines.push(...extractLines(tc));
   }
-  const fmt = firstPage.includes("Synlab") ? "synlab" : "corden";
-  const rows = (fmt === "synlab" ? parseSynlab : parseCorden)(allLines)
+  const fmt = firstPage.includes("Synlab") ? "synlab"
+    : firstPage.includes("LOINC") ? "eeszt" : "corden";
+  const parser = fmt === "synlab" ? parseSynlab
+    : fmt === "eeszt" ? parseEeszt : parseCorden;
+  const rows = parser(allLines)
     .filter((r) => r.test && r.result !== undefined);
   rows.forEach((r) => { r.file = fileName; });
   return rows;
