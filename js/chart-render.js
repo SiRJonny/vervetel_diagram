@@ -137,7 +137,7 @@ export function renderChart(canvas, series) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 200 },
+      animation: false, // no grow/slide-in when datasets appear
       layout: { padding: { right: rightPad } },
       parsing: false,
       normalized: true,
