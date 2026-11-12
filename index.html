@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vervetel Diagram</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+  <h1>Vervetel Diagram</h1>
+  <div class="actions">
+    <label class="btn" for="file-input">Import</label>
+    <input type="file" id="file-input" accept=".pdf,.csv,.json" multiple hidden>
+    <button id="export-btn" class="btn secondary" type="button">Export</button>
+  </div>
+</header>
+
+<p id="status" class="status"></p>
+
+<main>
+  <section id="chart-wrap">
+    <canvas id="chart"></canvas>
+  </section>
+
+  <aside id="analyte-panel" aria-label="Analog selection">
+    <h2>Values</h2>
+    <div id="analyte-list"><!-- filled by ui.js --></div>
+  </aside>
+</main>
+
+<footer class="note">
+  All data stays on this device. No network requests after page load.
+  <a href="#" id="toggle-detail">Details</a>
+  <span id="privacy-detail" hidden>
+    Blood test results are parsed in your browser and stored only in this
+    browser's local database (IndexedDB). Nothing is ever uploaded.
+  </span>
+</footer>
+
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

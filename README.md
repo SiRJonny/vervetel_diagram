@@ -36,5 +36,49 @@ makes zero network requests while you work.
 
 ## Running
 
-Open `index.html` or serve the folder with any static file server.
-No build step, no server-side component.
+Serve the folder with any static file server (IndexedDB and pdf.js need a
+real origin, not file://):
+
+```
+python -m http.server 8080
+```
+
+Then open http://localhost:8080. The app works fully offline after the
+first load; `vendor/` bundles Chart.js and pdf.js locally — no CDN.
+
+## Using
+
+- **Import**: drop or pick PDF lab reports (Corden / SYNLAB Hungarian
+  layouts), CSV, or a previous JSON export. Everything is parsed and stored
+  in your browser (IndexedDB).
+- **Chart**: values over time on a shared axis. Each selected analyte is
+  normalized to its own reference interval, which is drawn as the two dashed
+  common "ref min / ref max" lines. The right edge lists each series'
+  actual interval values, colored to match its line.
+- **Values panel**: checkboxes on desktop, horizontal chip scroller on
+  mobile. Default shows Hemoglobin only; selection persists locally.
+- **Export**: downloads all stored data as JSON — a local file save, never
+  an upload.
+
+## Project layout
+
+```
+index.html          entry page
+css/app.css         layout + mobile chip scroller
+js/app.js           wiring, state
+js/import.js        PDF/CSV/JSON dispatch + row enrichment
+js/pdf-parse.js     pdf.js text extraction, JS port of the Python parser
+js/normalize.js     test-name alias + unit normalization, colors
+js/chart-render.js  normalized multi-series chart + right-edge labels
+js/ui.js            analyte selection panel
+js/storage.js       IndexedDB, settings, export
+vendor/             chart.js + pdf.js (self-hosted)
+scripts/            offline dev tools (Python extractor, Node smoke test)
+```
+
+## Development
+
+- `npm run test:parse` — Node smoke test: parses `example_data` PDFs with
+  the browser parser and compares row counts to the Python extractor.
+- `scripts/extract_pdf_data.py` — same parsing in Python (reference
+  implementation, produces `example_data/extracted.csv`).

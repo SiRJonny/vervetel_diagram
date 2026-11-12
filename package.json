@@ -1,0 +1,13 @@
+{
+  "name": "vervetel-diagram",
+  "private": true,
+  "type": "module",
+  "description": "Local-only blood test diagram app. Static site, no build step, no runtime dependencies.",
+  "scripts": {
+    "serve": "python -m http.server 8080",
+    "test:parse": "node scripts/test_parse.mjs"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^3.11.174"
+  }
+}
