@@ -110,6 +110,19 @@ main {
 }
 .analyte.unavailable { opacity: 0.4; pointer-events: none; }
 
+.group { margin-bottom: 0.6rem; }
+.group:last-child { margin-bottom: 0; }
+.group h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0.4rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+.group h3:hover { color: var(--text); }
+
 footer.note {
   padding: 0.6rem 1.2rem;
   font-size: 0.8rem;
@@ -141,6 +154,15 @@ footer.note a { color: var(--muted); }
     overflow: visible;
   }
   #analyte-panel h2 { margin-bottom: 0.4rem; }
+  #analyte-list .group { display: contents; }
+  #analyte-list .group h3 {
+    flex: none;
+    align-self: center;
+    margin: 0 0.2rem 0 0.4rem;
+    writing-mode: initial;
+    border-left: 2px solid var(--panel-edge);
+    padding-left: 0.4rem;
+  }
   #analyte-list {
     display: flex;
     gap: 0.5rem;

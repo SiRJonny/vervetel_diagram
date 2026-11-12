@@ -137,6 +137,43 @@ export function analyteLabel(id) {
 
 export const CANONICAL_IDS = ANALYTES.map((x) => x[0]);
 
+// Standard lab panel groupings (concise, 6 groups).
+export const GROUPS = [
+  ["cbc", "Vérkép", [
+    "hemoglobin", "erythrocytes", "hematocrit", "leukocytes", "thrombocytes",
+    "mcv", "mch", "mchc", "rdw", "mpv",
+    "neutrophil-abs", "lymphocyte-abs", "monocyte-abs",
+    "eosinophil-abs", "basophil-abs",
+    "neutrophil-pct", "lymphocyte-pct", "monocyte-pct",
+    "eosinophil-pct", "basophil-pct",
+  ]],
+  ["liver", "Máj és enzimek", [
+    "asat", "alat", "ggt", "alp", "ldh", "amylase", "ck",
+    "bilirubin-total", "bilirubin-direct", "albumin", "total-protein",
+  ]],
+  ["kidney", "Vese", ["urea", "creatinine", "egfr", "uric-acid"]],
+  ["lipid-glucose", "Lipid és cukor", [
+    "cholesterol", "hdl", "ldl", "triglycerides",
+    "glucose", "hba1c-ifcc", "hba1c-pct",
+  ]],
+  ["electrolytes-iron", "Elektrolitok és vas", [
+    "sodium", "potassium", "calcium", "magnesium",
+    "iron", "transferrin", "tibc", "tfsat", "ferritin",
+  ]],
+  ["inflammation-hormones", "Gyulladás és hormon", [
+    "crp", "sed-rate", "tsh", "psa",
+  ]],
+];
+
+const GROUP_OF = new Map();
+for (const [gid, label, ids] of GROUPS) {
+  for (const id of ids) GROUP_OF.set(id, gid);
+}
+
+export function analyteGroup(id) {
+  return GROUP_OF.get(id) || "other";
+}
+
 // Stable color per analyte.
 const PALETTE = [
   "#ff5d5d", "#4da3ff", "#5ddba4", "#f5c451", "#b07dff",
