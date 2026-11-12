@@ -72,6 +72,13 @@ fileInput.addEventListener("change", async () => {
 exportBtn.addEventListener("click", () => exportJSON().then(() =>
   setStatus("Export downloaded (saved locally, not uploaded).")));
 
+document.getElementById("unselect-all").addEventListener("click", async () => {
+  visible.clear();
+  await saveSelection(visible);
+  await refresh();
+  setStatus("Selection cleared.");
+});
+
 document.getElementById("toggle-detail").addEventListener("click", (e) => {
   e.preventDefault();
   const d = document.getElementById("privacy-detail");

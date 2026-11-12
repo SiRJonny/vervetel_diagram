@@ -82,6 +82,33 @@ main {
   overflow-y: auto;
 }
 
+.panel-head {
+  position: sticky;
+  top: -0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--panel);
+  margin: -0.8rem -1rem 0.4rem;
+  padding: 0.8rem 1rem 0.5rem;
+  z-index: 2;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+.panel-head h2 { margin: 0; }
+
+.btn.small {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--panel-edge);
+  flex: none;
+}
+.btn.small:hover { border-color: var(--accent); color: var(--accent); }
+
 #analyte-panel h2 {
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -152,6 +179,13 @@ footer.note a { color: var(--muted); }
     grid-area: panel;
     max-height: none;
     overflow: visible;
+  }
+  .panel-head {
+    position: sticky;
+    top: 0;
+    margin: 0;
+    padding: 0.5rem 0 0.4rem;
+    background: var(--bg);
   }
   #analyte-panel h2 { margin-bottom: 0.4rem; }
   #analyte-list .group { display: contents; }
