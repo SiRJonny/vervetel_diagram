@@ -6,6 +6,8 @@
 // Each series' actual interval values are shown as colored labels on the
 // right edge, stacked top-down.
 
+import { unitAllowed } from "./normalize.js";
+
 export const BAND_LOW = 0.2;
 export const BAND_HIGH = 0.8;
 
@@ -31,22 +33,39 @@ export function buildSeries(rows, visibleIds) {
   }
 
   const series = [];
-  for (const [id, list] of byAnalyte) {
+  for (const [id, allRows] of byAnalyte) {
+    // unit guard: drop rows whose unit contradicts the analyte (e.g. urine
+    // sediment "/HPF" rows in reports stored before the import-side check)
+    const list = allRows.filter((r) => unitAllowed(id, r.unit));
+    if (!list.length) continue;
     // reference interval from the most recent row
     const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const latest = sorted[sorted.length - 1];
-    let lo = latest.refLowN, hi = latest.refHighN;
-    // One-sided reference ("max x"): use 0 as min, band bottom as its line.
-    if (lo === null && hi !== null) lo = 0;
-    if (lo === null || hi === null || hi <= lo) continue; // not plottable
 
-    const y = (v) => BAND_LOW + ((v - lo) / (hi - lo)) * (BAND_HIGH - BAND_LOW);
+    // effective ref pair for a row: own values, else the latest row's,
+    // with the 0-min fallback for one-sided references
+    const latestLo = latest.refLowN, latestHi = latest.refHighN;
+    const eff = (row) => {
+      let lo = row.refLowN ?? latestLo;
+      let hi = row.refHighN ?? latestHi;
+      if (lo === null && hi !== null) lo = 0;
+      return [lo, hi];
+    };
+
+    let [sLo, sHi] = eff(latest);
+    if (sLo === null || sHi === null || sHi <= sLo) continue; // not plottable
+
+    const y = (v, lo, hi) => BAND_LOW + ((v - lo) / (hi - lo)) * (BAND_HIGH - BAND_LOW);
     const points = sorted
-      .map((r) => ({
-        x: Date.parse(r.date),
-        y: Math.min(1, Math.max(0, y(r.value))),
-        raw: r,
-      }))
+      .map((r) => {
+        let [lo, hi] = eff(r);
+        if (lo === null || hi === null || hi <= lo) [lo, hi] = [sLo, sHi];
+        return {
+          x: Date.parse(r.date),
+          y: Math.min(1, Math.max(0, y(r.value, lo, hi))),
+          raw: r,
+        };
+      })
       .filter((p) => !Number.isNaN(p.x))
       .sort((a, b) => a.x - b.x);
     if (!points.length) continue;
@@ -60,11 +79,11 @@ export function buildSeries(rows, visibleIds) {
       id,
       label: latest.analyteLabel,
       unit: units.join(" / "),
-      refLow: lo,
-      refHigh: hi,
+      refLow: sLo,
+      refHigh: sHi,
       refLabel: oneSided
-        ? `< ${fmt(hi)}${unitStr}`
-        : `${fmt(lo)}–${fmt(hi)}${unitStr}`,
+        ? `< ${fmt(sHi)}${unitStr}`
+        : `${fmt(sLo)}–${fmt(sHi)}${unitStr}`,
       mixedUnits: false,
       points,
     });
