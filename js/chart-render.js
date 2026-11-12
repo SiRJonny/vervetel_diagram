@@ -54,6 +54,8 @@ export function buildSeries(rows, visibleIds) {
     const units = [...new Set(list.map((r) => r.unit).filter(Boolean))];
     const unitStr = units[0] ? " " + units[0] : "";
     const oneSided = latest.refLowN === null;
+    // hard guard: a series with contradictory units must never be drawn
+    if (units.length > 1) continue;
     series.push({
       id,
       label: latest.analyteLabel,
@@ -63,7 +65,7 @@ export function buildSeries(rows, visibleIds) {
       refLabel: oneSided
         ? `< ${fmt(hi)}${unitStr}`
         : `${fmt(lo)}–${fmt(hi)}${unitStr}`,
-      mixedUnits: units.length > 1,
+      mixedUnits: false,
       points,
     });
   }

@@ -1,7 +1,7 @@
 // import.js — load PDF / CSV / JSON files. All parsing is local.
 
 import { parsePdfFile } from "./pdf-parse.js";
-import { matchAnalyte, normalizeUnit, analyteLabel } from "./normalize.js";
+import { matchAnalyte, normalizeUnit, analyteLabel, unitAllowed } from "./normalize.js";
 import { saveRows, deleteFileRows, parseImportJSON, rowKey } from "./storage.js";
 
 // -- CSV -----------------------------------------------------------------
@@ -61,7 +61,8 @@ function numericResult(result) {
 }
 
 export function enrich(rows) {
-  return rows
+  const excluded = [];
+  const out = rows
     .map((r) => {
       const analyte = matchAnalyte(r.test);
       const num = numericResult(r.result);
@@ -73,11 +74,22 @@ export function enrich(rows) {
           else refLow = bm[2].replace(",", ".");
         }
       }
+      const unit = normalizeUnit(r.unit);
+      let analyteId = analyte ? analyte.id : null;
+      let analyteLabelOut = analyte ? analyte.label : r.test;
+      let excludedReason = "";
+      if (analyteId && !unitAllowed(analyteId, unit)) {
+        // e.g. a saturation % row wrongly matching a g/L analyte
+        excludedReason = `unit "${unit}" not expected for ${analyte.label}`;
+        analyteId = null;
+      }
+      if (excludedReason) excluded.push({ test: r.test, reason: excludedReason });
       return {
         ...r,
-        unit: normalizeUnit(r.unit),
-        analyteId: analyte ? analyte.id : null,
-        analyteLabel: analyte ? analyte.label : r.test,
+        unit,
+        analyteId,
+        analyteLabel: analyteLabelOut,
+        excluded: excludedReason,
         value: num ? num.value : null,
         bound: num ? num.bound : "",
         refLowN: refLow !== "" ? parseFloat(String(refLow).replace(",", ".")) : null,
@@ -85,6 +97,7 @@ export function enrich(rows) {
       };
     })
     .filter((r) => r.analyteId && r.value !== null);
+  return { rows: out, excluded };
 }
 
 // -- file dispatch -------------------------------------------------------
@@ -126,10 +139,13 @@ export async function importFiles(files) {
         errors.push(`${name}: unsupported file type`);
         continue;
       }
-      const rows = enrich(raw);
+      const { rows, excluded } = enrich(raw);
       if (!rows.length) {
         errors.push(`${name}: no blood test rows recognized`);
         continue;
+      }
+      for (const e of excluded) {
+        errors.push(`${name}: skipped "${e.test}" (${e.reason})`);
       }
       const existed = await hasFile(name);
       if (existed) {

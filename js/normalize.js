@@ -76,8 +76,8 @@ const ANALYTES = [
   ["total-protein", "Összfehérje", [/\bosszfeherje\b/]],
   ["iron", "Vas (Fe)", [/\bvas \(fe\)\b/, /\bserum vas\b/, /\bvas\b/]],
   ["tibc", "Transzferrin kapacitás", [/\bteljes vaskoto kapacitas\b/, /\btibc\b/]],
-  ["transferrin", "Transzferrin", [/\btranszferrin\b/]],
   ["tfsat", "Transzferrin szaturáció", [/\btranszferrin szaturacio\b/]],
+  ["transferrin", "Transzferrin", [/\btranszferrin\b/]],
   ["ferritin", "Ferritin", [/\bferritin\b/]],
   ["amylase", "Amiláz", [/\bamilaz\b/]],
   ["ck", "Kreatin kináz", [/\bkreatin kinaz\b/, /\bck\b/]],
@@ -172,6 +172,56 @@ for (const [gid, label, ids] of GROUPS) {
 
 export function analyteGroup(id) {
   return GROUP_OF.get(id) || "other";
+}
+
+// Expected normalized unit(s) per analyte. Rows with a unit outside this
+// list are excluded from charts (prevents mixing e.g. % with g/L).
+export const EXPECTED_UNITS = {
+  hemoglobin: ["g/L"],
+  erythrocytes: ["T/L"],
+  hematocrit: ["L/L"],
+  mcv: ["fL"],
+  mch: ["pg"],
+  mchc: ["g/L"],
+  rdw: ["%"],
+  mpv: ["fL"],
+  leukocytes: ["G/L"],
+  thrombocytes: ["G/L"],
+  "neutrophil-abs": ["G/L"], "lymphocyte-abs": ["G/L"],
+  "monocyte-abs": ["G/L"], "eosinophil-abs": ["G/L"], "basophil-abs": ["G/L"],
+  "neutrophil-pct": ["%"], "lymphocyte-pct": ["%"], "monocyte-pct": ["%"],
+  "eosinophil-pct": ["%"], "basophil-pct": ["%"],
+  sodium: ["mmol/L"], potassium: ["mmol/L"], calcium: ["mmol/L"],
+  magnesium: ["mmol/L"],
+  asat: ["U/L"], alat: ["U/L"], ggt: ["U/L"], alp: ["U/L"], ldh: ["U/L"],
+  amylase: ["U/L"], ck: ["U/L"],
+  cholesterol: ["mmol/L"], hdl: ["mmol/L"], ldl: ["mmol/L"],
+  triglycerides: ["mmol/L"],
+  creatinine: ["µmol/L"],
+  egfr: ["mL/min"],
+  urea: ["mmol/L"],
+  "uric-acid": ["µmol/L"],
+  "bilirubin-total": ["µmol/L"], "bilirubin-direct": ["µmol/L"],
+  glucose: ["mmol/L"],
+  crp: ["mg/L"],
+  albumin: ["g/L"],
+  "total-protein": ["g/L"],
+  iron: ["µmol/L"], tibc: ["µmol/L"],
+  transferrin: ["g/L"],
+  tfsat: ["%"],
+  ferritin: ["µg/L"], psa: ["µg/L"],
+  tsh: ["mIU/L"],
+  "sed-rate": ["mm/h"],
+  "hba1c-ifcc": ["mmol/mol"],
+  "hba1c-pct": ["%"],
+};
+
+// Returns false only when the row has a unit that contradicts the analyte's
+// expected unit (rows without unit are kept, cannot judge them).
+export function unitAllowed(id, unit) {
+  const expected = EXPECTED_UNITS[id];
+  if (!expected || !unit) return true;
+  return expected.includes(unit);
 }
 
 // Stable color per analyte.
