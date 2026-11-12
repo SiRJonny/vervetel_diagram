@@ -120,10 +120,12 @@ async function readAsArrayBuffer(file) {
   });
 }
 
-// Import one or more files; returns {added, replaced, errors} and persists.
+// Import one or more files; returns {added, replaced, errors, skipped} and persists.
+// "skipped" holds unusable rows (wrong unit etc.) — not errors, the rest loads.
 export async function importFiles(files) {
   let added = 0, replaced = 0;
   const errors = [];
+  const skipped = [];
   for (const file of files) {
     try {
       let raw = [];
@@ -145,7 +147,7 @@ export async function importFiles(files) {
         continue;
       }
       for (const e of excluded) {
-        errors.push(`${name}: skipped "${e.test}" (${e.reason})`);
+        skipped.push({ file: name, test: e.test, reason: e.reason });
       }
       const existed = await hasFile(name);
       if (existed) {
@@ -157,7 +159,7 @@ export async function importFiles(files) {
       errors.push(`${file.name}: ${e.message || e}`);
     }
   }
-  return { added, replaced, errors };
+  return { added, replaced, errors, skipped };
 }
 
 async function hasFile(name) {

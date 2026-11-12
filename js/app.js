@@ -59,6 +59,15 @@ fileInput.addEventListener("change", async () => {
   const parts = [];
   if (res.added) parts.push(`${res.added} new report(s)`);
   if (res.replaced) parts.push(`${res.replaced} replaced`);
+  // unusable rows are expected (urine sediment etc.) — a quiet note, not an error
+  if (res.skipped.length) {
+    const byFile = new Map();
+    for (const s of res.skipped) byFile.set(s.file, (byFile.get(s.file) || 0) + 1);
+    parts.push(`skipped ${res.skipped.length} unusable row(s) `
+      + [...byFile].map(([f, n]) => `${f}: ${n}`).join(", "));
+    console.log("Skipped rows (kept locally in console only):",
+      res.skipped.map((s) => `${s.file}: "${s.test}" ${s.reason}`));
+  }
   if (res.errors.length) {
     setStatus(`Imported ${parts.join(", ") || "nothing"}. Errors:\n` + res.errors.join("\n"), true);
   } else {
