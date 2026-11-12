@@ -35,7 +35,9 @@ export function buildSeries(rows, visibleIds) {
     // reference interval from the most recent row
     const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const latest = sorted[sorted.length - 1];
-    const lo = latest.refLowN, hi = latest.refHighN;
+    let lo = latest.refLowN, hi = latest.refHighN;
+    // One-sided reference ("max x"): use 0 as min, band bottom as its line.
+    if (lo === null && hi !== null) lo = 0;
     if (lo === null || hi === null || hi <= lo) continue; // not plottable
 
     const y = (v) => BAND_LOW + ((v - lo) / (hi - lo)) * (BAND_HIGH - BAND_LOW);
@@ -50,13 +52,17 @@ export function buildSeries(rows, visibleIds) {
     if (!points.length) continue;
 
     const units = [...new Set(list.map((r) => r.unit).filter(Boolean))];
+    const unitStr = units[0] ? " " + units[0] : "";
+    const oneSided = latest.refLowN === null;
     series.push({
       id,
       label: latest.analyteLabel,
       unit: units.join(" / "),
       refLow: lo,
       refHigh: hi,
-      refLabel: `${fmt(lo)}–${fmt(hi)}${units[0] ? " " + units[0] : ""}`,
+      refLabel: oneSided
+        ? `< ${fmt(hi)}${unitStr}`
+        : `${fmt(lo)}–${fmt(hi)}${unitStr}`,
       mixedUnits: units.length > 1,
       points,
     });
@@ -121,6 +127,10 @@ export function renderChart(canvas, series) {
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
 
+  // Reserve space on the right so the interval labels never get clipped.
+  const maxLabelLen = Math.max(10, ...labels.map((l) => l.text.length));
+  const rightPad = Math.min(200, Math.max(96, Math.round(maxLabelLen * 7.2) + 18));
+
   const chart = new Chart(canvas, {
     type: "line",
     data: { datasets },
@@ -128,6 +138,7 @@ export function renderChart(canvas, series) {
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 200 },
+      layout: { padding: { right: rightPad } },
       parsing: false,
       normalized: true,
       interaction: { mode: "nearest", intersect: true },

@@ -23,8 +23,8 @@ function collectAnalytes(rows) {
     }
     const a = map.get(r.analyteId);
     a.count++;
-    if (r.refLowN === null || r.refHighN === null
-      || r.refHighN <= r.refLowN) a.plottable = false;
+    // Plottable needs a numeric max; min may fall back to 0.
+    if (r.refHighN === null || r.refHighN <= (r.refLowN ?? 0)) a.plottable = false;
   }
   return map;
 }
