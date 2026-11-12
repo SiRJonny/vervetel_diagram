@@ -19,6 +19,9 @@ const ANALYTES = [
     /\bhemoglobin a1c\s*\(ifcc\)/, /\bhemoglobin a1c-ifcc\b/]],
   ["hba1c-pct", "HbA1c %", [/\bhemoglobin a1c\s*%/]],
   ["hemoglobin", "Hemoglobin", [/\bhemoglobin\b/, /\bhb\b/]],
+  // sed-rate must be matched before plain erythrocytes ("Vörösvérsejt süllyedés")
+  ["sed-rate", "Vörösvérsejt süllyedés", [
+    /\bvorosversejt sullyedes\b/, /\bvorosvertest sullyedes\b/]],
   ["leukocytes", "Fehérvérsejt", [
     /\bfeherversejt(szam|szamzam|szabszam)?\b/, /\bfeherversejt szam\b/,
     /\bfeherversejt \(abszolut\)\b/, /\bwbc\b/, /\bleukocita\b/]],
@@ -85,7 +88,6 @@ const ANALYTES = [
   ["tsh", "TSH", [/\btireoidea stimulalo hormon\b/, /\btsh\b/]],
   ["alp", "Alkalikus foszfatáz", [/\balkalikus foszfataz\b/]],
   ["ldh", "LDH", [/\blaktat dehidrogenaz\b/, /\bldh\b/]],
-  ["sed-rate", "Vörösvérsejt süllyedés", [/\bvorosversejt sullyedes\b/]],
 ];
 
 // Unit normalization: different labs, same dimension.
@@ -95,6 +97,7 @@ const UNIT_MAP = [
   [/^umol\/l$/i, "µmol/L"],
   [/^ug\/l$/i, "µg/L"],
   [/^ml\/perc/i, "mL/min"],
+  [/^ml\/min(\/1[.,]73\s*m2)?$/i, "mL/min"], // eGFR: mL/min/1.73m2 → mL/min
   [/^mm\/(ora|óra)$/i, "mm/h"],
   [/^giga$/i, "G/L"],
 ];

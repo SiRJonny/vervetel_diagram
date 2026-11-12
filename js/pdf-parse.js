@@ -84,6 +84,13 @@ function isUnitLike(token) {
     && /[A-Za-zµ°%]/.test(token);
 }
 
+// Units must contain a slash/percent/digit/² or be short (pg, fL).
+// Rejects words like "Negatív" or "felett" being taken as units.
+function isUnitToken(token) {
+  return isUnitLike(token)
+    && (/[\/%0-9²]/.test(token) || token.length <= 3);
+}
+
 function cleanRefText(tokens) {
   while (tokens.length && (FLAGS.has(tokens[0]) || tokens[0] === "-")) tokens.shift();
   return tokens.join(" ").trim();
@@ -209,7 +216,7 @@ function parseSynlab(lines) {
       // non-numeric result row: name <result-word> <ref> [unit]
       const name = tokens.slice(0, wordIdx).join(" ").trim();
       const rest = tokens.slice(wordIdx + 1);
-      const unit = rest.length && isUnitLike(rest[rest.length - 1]) ? rest.pop() : "";
+      const unit = rest.length && isUnitToken(rest[rest.length - 1]) ? rest.pop() : "";
       rows.push(makeRow(date, joinName(pendingName, name), tokens[wordIdx],
         unit, cleanRefText(rest), "", true));
       pendingName = "";
@@ -226,7 +233,7 @@ function parseSynlab(lines) {
     // besides the unit, it is a reference; otherwise it is the result.
     let attached = "";
     if (opIndex !== null || resultToken.startsWith("<") || resultToken.startsWith(">")) {
-      const rest = after.length && isUnitLike(after[after.length - 1])
+      const rest = after.length && isUnitToken(after[after.length - 1])
         ? after.slice(0, -1) : after;
       if (!rest.some((t) => NUM_RE.test(t) || REF_BOUND_RE.test(t))) {
         attached = prefix || resultToken[0];
@@ -240,7 +247,7 @@ function parseSynlab(lines) {
       else after.shift();
     }
     let unit = "", refTokens = after;
-    if (after.length && isUnitLike(after[after.length - 1])) {
+    if (after.length && isUnitToken(after[after.length - 1])) {
       unit = after.pop();
       refTokens = after;
     }
@@ -273,7 +280,7 @@ const EESZT_DATE_RE =
 const LOINC_RE = /^\d{2,7}-\d$/;
 const ORDINAL_RE = /^\d{1,3}$/;
 const EESZT_SECTIONS = new Set([
-  "teljes vérkép", "általános vizelet vizsgálat", "vizelet ülédék",
+  "teljes vérkép", "általános vizelet vizsgálat", "vizelet üledék",
   "általános laboratóriumi lelet",
 ]);
 const EESZT_FLAGS = new Set(["alacsony", "magas"]);
@@ -296,6 +303,8 @@ function parseEeszt(lines) {
     const dm = EESZT_DATE_RE.exec(line);
     if (dm) { date = dm[1].replace(/\./g, "-"); continue; }
     if (isFooter(line)) continue;
+    // "Minta nem érkezett" rows carry no data and poison pendingName
+    if (/minta nem érkezett/i.test(line)) continue;
     let tokens = line.split(/\s+/);
 
     // section headers between row blocks
@@ -305,16 +314,11 @@ function parseEeszt(lines) {
       continue;
     }
 
-    // strip leading ordinal number and optional LOINC code
+    // strip leading noise: ordinal number, LOINC code, stray "*"
+    while (tokens.length && tokens[0] === "*") tokens = tokens.slice(1);
     if (tokens.length && ORDINAL_RE.test(tokens[0])) tokens = tokens.slice(1);
     if (tokens.length && LOINC_RE.test(tokens[0])) tokens = tokens.slice(1);
     if (!tokens.length) continue;
-
-    // "eGFR 90 felett VALIDÁLT": reference only, no result — drop the row
-    if (tokens.length >= 2 && tokens[tokens.length - 1] === "felett"
-        && NUM_RE.test(tokens[tokens.length - 2])) {
-      continue;
-    }
 
     // locate result: first bare number token
     const idx = tokens.findIndex((t) => NUM_RE.test(t));
@@ -339,16 +343,18 @@ function parseEeszt(lines) {
     while (after.length && /^(valid|validált)$/i.test(after[after.length - 1])) {
       after.pop();
     }
+    // "eGFR 90 felett VALIDÁLT": reference only, no result — drop the row
+    if (after.length === 1 && after[0] === "felett") continue;
     let flag = "";
     if (after.length && EESZT_FLAGS.has(after[after.length - 1])) {
       flag = after.pop();
     }
     let unit = "";
-    if (after.length && isUnitLike(after[0])) {
+    if (after.length && isUnitToken(after[0])) {
       unit = after.shift();
     }
     // reference may repeat the unit ("136.00 - 177.00 g/L")
-    if (after.length && isUnitLike(after[after.length - 1])) after.pop();
+    if (after.length && isUnitToken(after[after.length - 1])) after.pop();
     const refText = cleanRefText(after);
     rows.push(makeRow(date, name, result, unit, refText, flag, false));
   }

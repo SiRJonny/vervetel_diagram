@@ -78,7 +78,7 @@ export function enrich(rows) {
       let analyteId = analyte ? analyte.id : null;
       let analyteLabelOut = analyte ? analyte.label : r.test;
       let excludedReason = "";
-      if (analyteId && !unitAllowed(analyteId, unit)) {
+      if (analyteId && num && !unitAllowed(analyteId, unit)) {
         // e.g. a saturation % row wrongly matching a g/L analyte
         excludedReason = `unit "${unit}" not expected for ${analyte.label}`;
         analyteId = null;
