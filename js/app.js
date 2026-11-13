@@ -33,6 +33,8 @@ async function refresh() {
   const rows = await loadAllRows();
   const analytes = collectAnalytes(rows);
   renderAnalyteList(analyteList, analytes, visible, onSelectionChange);
+  const countEl = document.getElementById("sel-count");
+  if (countEl) countEl.textContent = `${visible.size} selected`;
   const series = buildSeries(rows, visible);
   series.forEach((s) => { s.color = analyteColor(s.id); });
   if (chart) chart.destroy();
@@ -81,11 +83,17 @@ fileInput.addEventListener("change", async () => {
 exportBtn.addEventListener("click", () => exportJSON().then(() =>
   setStatus("Export downloaded (saved locally, not uploaded).")));
 
-document.getElementById("unselect-all").addEventListener("click", async () => {
+document.getElementById("unselect-all").addEventListener("click", async (e) => {
+  e.stopPropagation(); // mobile: the panel head is also a collapse toggle
   visible.clear();
   await saveSelection(visible);
   await refresh();
   setStatus("Selection cleared.");
+});
+
+// Mobile: the panel header bar collapses/expands the chip area.
+document.querySelector(".panel-head").addEventListener("click", () => {
+  document.getElementById("analyte-panel").classList.toggle("collapsed");
 });
 
 // Wipes the local IndexedDB (results + settings). Irreversible — the browser
