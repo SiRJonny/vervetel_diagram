@@ -1,6 +1,10 @@
 # Sample patient data — never committed (GDPR Art. 9)
 example_data/
+*.pdf
+*.csv
 
 __pycache__/
 *.pyc
 node_modules/
+.DS_Store
+Thumbs.db
