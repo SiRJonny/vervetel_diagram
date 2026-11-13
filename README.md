@@ -46,6 +46,14 @@ python -m http.server 8080
 Then open http://localhost:8080. The app works fully offline after the
 first load; `vendor/` bundles Chart.js and pdf.js locally — no CDN.
 
+### GitHub Pages
+
+The repo is a plain static site — no build step. Enable
+**Settings → Pages → Deploy from a branch → `master` / `(root)`** and open
+`https://<user>.github.io/vervetel_diagram/`. All asset paths are relative,
+`.nojekyll` disables Jekyll processing. After the page loads the app makes
+zero network requests — the Pages server never sees your lab reports.
+
 ## Using
 
 - **Import**: drop or pick PDF lab reports (Corden / SYNLAB Hungarian
