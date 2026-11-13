@@ -2,7 +2,7 @@
 // and render without runtime errors. Run: node scripts/test_render.mjs
 globalThis.pdfjsLib = { GlobalWorkerOptions: {} };
 const mkEl = () => ({
-  children: [], style: {}, dataset: {}, hidden: false, className: "",
+  children: [], style: { setProperty() {} }, dataset: {}, hidden: false, className: "",
   appendChild(c) { this.children.push(c); },
   append(...c) { this.children.push(...c); },
   addEventListener() {},
