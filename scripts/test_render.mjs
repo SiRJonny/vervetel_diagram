@@ -9,6 +9,7 @@ const mkEl = () => ({
   set innerHTML(v) { this.children = []; },
   get innerHTML() { return ""; },
   textContent: "", title: "", type: "", setAttribute() {},
+  classList: { add() {}, remove() {}, toggle() {} },
   querySelector() { return null; },
   parentElement: { querySelector() { return null; }, appendChild() {} },
   getBoundingClientRect() { return { top: 0, bottom: 0, left: 0, width: 0 }; },
