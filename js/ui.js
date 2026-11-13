@@ -127,8 +127,11 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
       a[1].label.localeCompare(b[1].label))) {
       const color = analyteColor(id);
       const label = document.createElement("label");
+      // color via CSS var: mobile overrides text color (chips are muted
+      // until selected), desktop keeps the per-analyte color
+      label.style.setProperty("--analyte-color", color);
       label.className = "analyte" + (info.plottable ? "" : " unavailable");
-      label.style.color = color;
+      if (visible.has(id) && info.plottable) label.classList.add("on");
       label.title = info.plottable
         ? `${info.count} measurement(s)`
         : "No numeric reference interval — cannot be normalized";
