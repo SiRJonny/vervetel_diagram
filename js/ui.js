@@ -23,8 +23,10 @@ export function saveSelection(visible) {
 // containers (mobile chip scroller) can't clip it.
 let infoPopup = null;
 let infoPopupFor = null;
+let infoOpenVia = ""; // "hover" or "click" — touch fires mouseenter then click
 
-function showInfo(btn, id) {
+function showInfo(btn, id, via = "hover") {
+  infoOpenVia = via;
   const desc = analyteDescription(id);
   if (!desc) return;
   if (!infoPopup) {
@@ -157,19 +159,25 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
       infoBtn.dataset.name = analyteLabel(id);
       infoBtn.title = "Rövid leírás";
       infoBtn.setAttribute("aria-label", `${analyteLabel(id)} leírása`);
-      infoBtn.addEventListener("mouseenter", () => showInfo(infoBtn, id));
+      infoBtn.addEventListener("mouseenter", () => showInfo(infoBtn, id, "hover"));
       infoBtn.addEventListener("mouseleave", () => {
         if (infoPopupFor === infoBtn) hideInfo();
       });
-      infoBtn.addEventListener("focus", () => showInfo(infoBtn, id));
+      infoBtn.addEventListener("focus", () => showInfo(infoBtn, id, "hover"));
       infoBtn.addEventListener("blur", () => {
         if (infoPopupFor === infoBtn) hideInfo();
       });
       infoBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (infoPopupFor === infoBtn && infoPopup && !infoPopup.hidden) hideInfo();
-        else showInfo(infoBtn, id);
+        // touch: mouseenter already opened it ("hover") — keep it, mark as
+        // click-opened; the next tap (click-opened) closes it. Desktop mouse
+        // users just hover, so this rarely fires.
+        if (infoPopupFor === infoBtn && !infoPopup.hidden && infoOpenVia === "click") {
+          hideInfo();
+        } else {
+          showInfo(infoBtn, id, "click");
+        }
       });
 
       label.append(cb, dot, text, infoBtn);

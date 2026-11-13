@@ -141,14 +141,20 @@ export function renderChart(canvas, series) {
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
 
+  // Mobile: no right-edge interval labels (they eat too much width);
+  // users tap a point and the tooltip shows the reference interval.
+  const isMobile = window.matchMedia("(max-width: 820px)").matches;
+  const drawnLabels = isMobile ? [] : labels;
+
   // x ticks only at actual datapoint dates (union across visible series)
   const pointDates = [...new Set(
     series.flatMap((s) => s.points.map((p) => p.x)),
   )].sort((a, b) => a - b);
 
   // Reserve space on the right so the interval labels never get clipped.
-  const maxLabelLen = Math.max(10, ...labels.map((l) => l.text.length));
-  const rightPad = Math.min(200, Math.max(96, Math.round(maxLabelLen * 7.2) + 18));
+  const rightPad = isMobile ? 8
+    : Math.min(200, Math.max(96, Math.round(
+        Math.max(10, ...labels.map((l) => l.text.length)) * 7.2) + 18));
 
   const chart = new Chart(canvas, {
     type: "line",
@@ -196,7 +202,7 @@ export function renderChart(canvas, series) {
             },
           },
         },
-        refBand: { labels },
+        refBand: { labels: drawnLabels },
       },
     },
     plugins: [refBandPlugin],
