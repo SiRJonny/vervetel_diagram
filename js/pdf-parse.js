@@ -129,6 +129,9 @@ const CORDEN_DATE_RE = /Mintavétel ideje[^:]*:\s*(\d{4}-\d{2}-\d{2})/;
 const CORDEN_ROW_RE = /^(?:\d{4,6}\s+)?(.+?)\s*:\s*(.+)$/;
 const CORDEN_CONT_RE = new RegExp(`^${NUM}\\s*(mL/perc|felett|mmol/L)`);
 const CORDEN_CODE_RE = /^\d{4,6}[A-Z]?\s+/;
+// "name : value" header lines repeated on every page — never measurements
+const CORDEN_HEADER_RE =
+  /^(?:Név|Azonosító|Sorszám|Születési idő|Állampolgárság|Lakcím|Elérhetőség|Nem|Intézmény|Ellátás|Mintavétel|Térítési|Napló|Szervezeti egység|Beküldő|Ellátó|Ellátott személy|Vizsgálatot végző laboratórium|Laboratórium|Státusz|Referenciatartomány|LOINC)\b/i;
 
 function parseCorden(lines) {
   let date = "";
@@ -148,6 +151,7 @@ function parseCorden(lines) {
       continue;
     }
     const name = rm[1].trim().replace(CORDEN_CODE_RE, "");
+    if (CORDEN_HEADER_RE.test(name)) continue;
     const tokens = rm[2].trim().split(/\s+/);
     const idx = tokens.findIndex((t) => NUM_RE.test(t));
     if (idx === -1) continue;
@@ -285,6 +289,10 @@ const EESZT_SECTIONS = new Set([
 ]);
 const EESZT_FLAGS = new Set(["alacsony", "magas"]);
 
+// "Név: ...", "Azonosító: ..." style header lines repeated on every page.
+const EESZT_HEADER_RE =
+  /\b(?:Név|Azonosító|Születési idő|Állampolgárság|Lakcím|Elérhetőség|Térítési|Napló|Ellátási forma|Szervezeti egység|Intézmény|Ellátó személy|Beküldő orvos)\s*:/i;
+
 function parseEeszt(lines) {
   let date = "";
   const rows = [];
@@ -302,6 +310,7 @@ function parseEeszt(lines) {
     }
     const dm = EESZT_DATE_RE.exec(line);
     if (dm) { date = dm[1].replace(/\./g, "-"); continue; }
+    if (EESZT_HEADER_RE.test(line)) continue;
     if (isFooter(line)) continue;
     // "Minta nem érkezett" rows carry no data and poison pendingName
     if (/minta nem érkezett/i.test(line)) continue;
