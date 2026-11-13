@@ -98,13 +98,28 @@ export function renderAnalyteList(container, analytes, visible, onChange) {
     if (!byGroup.has(gid)) byGroup.set(gid, []);
     byGroup.get(gid).push([id, info]);
   }
-  const order = [...GROUPS.map((g) => g[0]), "other"];
-  const groupLabel = (gid) =>
-    gid === "other" ? "Egyéb" : (GROUPS.find((g) => g[0] === gid)?.[1] ?? gid);
+  // "Selected" pseudo-group on top: exactly what is on the diagram right now
+  const order = [
+    ...(byGroup.has("selected") || visible.size ? ["selected"] : []),
+    ...GROUPS.map((g) => g[0]),
+    "other",
+  ];
+  const groupLabel = (gid) => {
+    if (gid === "selected") return "Selected";
+    return gid === "other" ? "Egyéb" : (GROUPS.find((g) => g[0] === gid)?.[1] ?? gid);
+  };
+  const groupItems = (gid) => {
+    if (gid === "selected") {
+      return [...analytes]
+        .filter(([id]) => visible.has(id))
+        .sort((a, b) => a[1].label.localeCompare(b[1].label));
+    }
+    return byGroup.get(gid);
+  };
 
   for (const gid of order) {
-    const items = byGroup.get(gid);
-    if (!items) continue;
+    const items = groupItems(gid);
+    if (!items || !items.length) continue;
     const group = document.createElement("div");
     group.className = "group";
 

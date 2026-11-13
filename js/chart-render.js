@@ -4,12 +4,18 @@
 // (refLow..refHigh) maps onto a fixed common band (BAND_LOW..BAND_HIGH)
 // on the shared y axis. Two dashed horizontal lines mark that band.
 // Each series' actual interval values are shown as colored labels on the
-// right edge, stacked top-down.
+// right edge (desktop only; mobile users tap a point for the tooltip).
+// Clicking/tapping a plot line selects that series: the dashed band lines
+// are annotated with its interval values and its name shows top-right.
 
 import { unitAllowed } from "./normalize.js";
 
 export const BAND_LOW = 0.2;
 export const BAND_HIGH = 0.8;
+
+// Currently selected plot series (analyte id), survives chart re-renders.
+// Null = nothing selected.
+let selectedId = null;
 
 function fmt(v) {
   if (v === null || v === undefined) return "–";
@@ -103,11 +109,28 @@ const refBandPlugin = {
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(150,160,175,0.8)";
-    ctx.font = "10px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText("ref max", ca.left + 4, yHigh - 3);
-    ctx.fillText("ref min", ca.left + 4, yLow + 11);
+
+    // selected series: annotate the dashed lines with its interval values,
+    // centered on each line; series name small in the top-right corner
+    const sel = opts.selected;
+    if (sel !== null && sel !== undefined) {
+      const s = chart.data.datasets[sel]?.series;
+      if (s) {
+        const cx = (ca.left + ca.right) / 2;
+        ctx.font = "10px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(223,228,234,0.9)";
+        const unit = s.unit ? " " + s.unit : "";
+        ctx.fillText(fmt(s.refLow) + unit, cx, yLow + 11);
+        ctx.fillText(fmt(s.refHigh) + unit, cx, yHigh - 3);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "rgba(139,148,163,0.9)";
+        ctx.font = "italic 10px system-ui";
+        ctx.fillText(s.label, ca.right - 4, ca.top + 10);
+      }
+    }
+
+    if (!opts.labels.length) { ctx.restore(); return; }
 
     // per-series interval labels, stacked on the right edge
     ctx.textAlign = "left";
@@ -125,6 +148,8 @@ const refBandPlugin = {
 };
 
 export function renderChart(canvas, series) {
+  // Selection survives list refreshes (analyte toggles destroy the chart);
+  // keyed by analyte id, resolved to an index at render time.
   const datasets = series.map((s) => ({
     label: s.label,
     data: s.points,
@@ -138,6 +163,20 @@ export function renderChart(canvas, series) {
     pointStyle: "circle",
     series: s, // tooltip reads the series-level (latest) reference
   }));
+
+  const selectedIdx = () => {
+    const i = datasets.findIndex((ds) => ds.series.id === selectedId);
+    return i >= 0 ? i : null;
+  };
+  const applySelection = (chart) => {
+    chart.data.datasets.forEach((ds) => {
+      const sel = ds.series.id === selectedId;
+      ds.borderWidth = sel ? 3.5 : 2;
+      ds.pointRadius = sel ? 5 : 4;
+    });
+    chart.options.plugins.refBand.selected = selectedIdx();
+    chart.update("none");
+  };
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
 
@@ -167,6 +206,19 @@ export function renderChart(canvas, series) {
       parsing: false,
       normalized: true,
       interaction: { mode: "nearest", intersect: true },
+      onClick(e, elements, chart) {
+        let idx = elements.length ? elements[0].datasetIndex : null;
+        if (idx === null) {
+          // touch taps often miss the point radius — fall back to nearest
+          const near = chart.getElementsAtEventForMode(e, "nearest",
+            { intersect: false }, true);
+          idx = near.length ? near[0].datasetIndex : null;
+        }
+        if (idx === null) return;
+        const id = chart.data.datasets[idx].series.id;
+        selectedId = selectedId === id ? null : id; // second click deselects
+        applySelection(chart);
+      },
       scales: {
         x: {
           type: "linear",
@@ -193,7 +245,7 @@ export function renderChart(canvas, series) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => isoDate(items[0].parsed.x),
+            title: () => "", // the date is on the x axis already — value only
             label: (item) => {
               const raw = item.raw.raw;
               const s = item.dataset.series;
@@ -202,7 +254,7 @@ export function renderChart(canvas, series) {
             },
           },
         },
-        refBand: { labels: drawnLabels },
+        refBand: { labels: drawnLabels, selected: selectedIdx() },
       },
     },
     plugins: [refBandPlugin],
