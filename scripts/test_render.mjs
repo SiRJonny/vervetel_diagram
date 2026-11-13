@@ -15,6 +15,7 @@ const mkEl = () => ({
 });
 globalThis.window = globalThis;
 globalThis.window.addEventListener = () => {};
+globalThis.window.matchMedia = () => ({ matches: false });
 globalThis.document = {
   createElement: mkEl,
   getElementById: () => mkEl(),
