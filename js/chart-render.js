@@ -148,16 +148,16 @@ const refBandPlugin = {
       const s = chart.data.datasets[sel]?.series;
       if (s) {
         const cx = (ca.left + ca.right) / 2;
-        ctx.font = "10px system-ui";
+        ctx.font = "13px system-ui";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(223,228,234,0.9)";
         const unit = s.unit ? " " + s.unit : "";
-        ctx.fillText(fmt(s.refLow) + unit, cx, yLow + 11);
-        ctx.fillText(fmt(s.refHigh) + unit, cx, yHigh - 3);
+        ctx.fillText(fmt(s.refLow) + unit, cx, yLow + 13);
+        ctx.fillText(fmt(s.refHigh) + unit, cx, yHigh - 5);
         ctx.textAlign = "right";
         ctx.fillStyle = s.color || "rgba(139,148,163,0.9)";
-        ctx.font = "italic 10px system-ui";
-        ctx.fillText(s.label, ca.right - 4, ca.top + 10);
+        ctx.font = "italic 13px system-ui";
+        ctx.fillText(s.label, ca.right - 4, ca.top + 14);
       }
     }
 
@@ -187,9 +187,11 @@ export function renderChart(canvas, series) {
     showLine: true,
     borderColor: s.color,
     backgroundColor: s.color,
-    pointRadius: 4,
+    // selection style must exist at creation too — otherwise the thickened
+    // selected line snaps back to thin on every list-driven re-render
+    pointRadius: s.id === selectedId ? 5 : 4,
     pointHoverRadius: 6,
-    borderWidth: 2,
+    borderWidth: s.id === selectedId ? 3.5 : 2,
     tension: 0.15,
     pointStyle: "circle",
     series: s, // tooltip reads the series-level (latest) reference
