@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chart move test</title>
+<style>
+  main { display: grid; grid-template-columns: 1fr 280px; gap: 1rem; padding: 0 1.2rem 1rem; align-items: start; }
+  #chart-wrap { position: relative; background: #1d222b; border: 1px solid #2b323e;
+    border-radius: 10px; height: min(70vh, 560px); padding: 1rem; }
+  body { margin: 0; background: #14171c; }
+  header { padding: 0.8rem 1.2rem; color: #dfe4ea; font-family: system-ui; }
+</style>
+</head>
+<body>
+<header>chart move test</header>
+<main>
+  <section id="chart-wrap"><canvas id="chart"></canvas></section>
+  <aside></aside>
+</main>
+<script src="vendor/chart.umd.min.js"></script>
+<script type="module">
+  const mk = (id, label, unit, lo, hi, vals, date) => vals.map((v, i) => ({
+    analyteId: id, analyteLabel: label, value: v, bound: "",
+    refLowN: lo, refHighN: hi, unit, date: `202${i}-0${(i % 9) + 1}-1${i}`,
+  }));
+  const rows = [
+    ...mk("a", "Hemoglobin", "g/L", 120, 155, [129, 135, 157, 141, 138, 133]),
+    ...mk("b", "Kreatinin", "µmol/L", 64, 104, [90, 93, 88, 95, 91, 89]),
+    ...mk("c", "HDL koleszterin", "mmol/L", 1.05, 1.55, [1.31, 1.3, 1.4, 1.22, 1.45, 1.18]),
+  ];
+  const { buildSeries, renderChart } = await import("./js/chart-render.js");
+  const series = buildSeries(rows, new Set(["a", "b", "c"]));
+  series.forEach((s) => { s.color = "#e3b341"; });
+  window.__chart = renderChart(document.getElementById("chart"), series);
+</script>
+</body>
+</html>

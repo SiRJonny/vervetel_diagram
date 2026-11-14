@@ -235,7 +235,15 @@ export function renderChart(canvas, series) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false, // no grow/slide-in when datasets appear
-      layout: { padding: { right: rightPad } },
+      layout: {
+        // Chart.js "auto padding" insets the chart area by the datasets'
+        // max point/border overflow, which it reads one update stale —
+        // toggling a line's thickness (selection) then shifts the whole
+        // layout back and forth (verified in a real browser). Fixed
+        // padding instead: the chart area never moves on selection.
+        autoPadding: false,
+        padding: { left: 8, top: 8, right: rightPad },
+      },
       parsing: false,
       normalized: true,
       interaction: { mode: "nearest", intersect: true },
