@@ -173,40 +173,83 @@ const refBandPlugin = {
     // room, and it spares the user from hovering each point
     if (chart.data.datasets.length <= 3) {
       ctx.font = "10px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      // occupied space: every marker blocks its surroundings
+      const placed = [];
+      for (let i = 0; i < chart.data.datasets.length; i++) {
+        const meta = chart.getDatasetMeta(i);
+        if (meta) for (const el of meta.data) {
+          if (el) placed.push({ x0: el.x - 4.5, y0: el.y - 4.5, x1: el.x + 4.5, y1: el.y + 4.5 });
+        }
+      }
+      // pick the best spot around (x,y) for a text of width w: prefer the
+      // sides away from the line's incoming/outgoing segments and away from
+      // already placed labels; the least-bad spot wins if everything collides
+      const DIRS = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, -1], [1, 1], [-1, 1]];
+      const ptSegDist = (px, py, ax, ay, bx, by) => {
+        const dx = bx - ax, dy = by - ay;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      };
+      const place = (text, x, y, segs) => {
+        const w = ctx.measureText(text).width;
+        const cands = DIRS.map(([dx, dy], rank) => {
+          const cx = x + dx * (dx ? 6 + w / 2 : 0);
+          const cy = y + dy * (dx ? 9 : 10);
+          const rect = { x0: cx - w / 2 - 1, y0: cy - 7, x1: cx + w / 2 + 1, y1: cy + 7 };
+          let hits = rect.x0 < ca.left - 4 || rect.x1 > ca.right + 4
+            || rect.y0 < ca.top - 4 || rect.y1 > ca.bottom + 4 ? 1 : 0;
+          let pen = 0;
+          for (const s of segs) pen += Math.max(0, 13 - ptSegDist(cx, cy, s[0], s[1], s[2], s[3]));
+          for (const r of placed) {
+            if (rect.x0 < r.x1 && r.x0 < rect.x1 && rect.y0 < r.y1 && r.y0 < rect.y1) hits++;
+          }
+          return { rank, cx, cy, pen, hits };
+        }).sort((a, b) => (a.hits - b.hits) || (a.pen - b.pen) || (a.rank - b.rank));
+        const best = cands[0];
+        placed.push({
+          x0: best.cx - w / 2 - 1, y0: best.cy - 7,
+          x1: best.cx + w / 2 + 1, y1: best.cy + 7,
+        });
+        return best;
+      };
+      // values first, then names — names get the pick of what is left
+      const metas = [];
       for (let i = 0; i < chart.data.datasets.length; i++) {
         const ds = chart.data.datasets[i];
         const meta = chart.getDatasetMeta(i);
         if (!meta || !meta.data.length) continue;
-        const s = ds.series;
-        ctx.fillStyle = s.color || "#dfe4ea";
+        metas.push([ds, meta]);
+        ctx.fillStyle = ds.series.color || "#dfe4ea";
         for (let k = 0; k < meta.data.length; k++) {
           const el = meta.data[k];
           const row = ds.data[k].raw;
           if (!el || row.value === null || row.value === undefined) continue;
-          const text = (row.bound || "") + fmt(row.value);
-          if (el.x > ca.right - ctx.measureText(text).width - 12) {
-            ctx.textAlign = "right";
-            ctx.fillText(text, el.x - 7, el.y + 3.5);
-          } else {
-            ctx.textAlign = "left";
-            ctx.fillText(text, el.x + 7, el.y + 3.5);
+          const segs = [];
+          if (k > 0) segs.push([meta.data[k - 1].x, meta.data[k - 1].y, el.x, el.y]);
+          if (k < meta.data.length - 1) {
+            segs.push([el.x, el.y, meta.data[k + 1].x, meta.data[k + 1].y]);
           }
+          const text = (row.bound || "") + fmt(row.value);
+          const best = place(text, el.x, el.y, segs);
+          ctx.fillText(text, best.cx, best.cy);
         }
-        // series name at the last marker, above it (below when clipped)
+      }
+      for (const [ds, meta] of metas) {
         const last = meta.data[meta.data.length - 1];
+        const segs = meta.data.length > 1
+          ? [[meta.data[meta.data.length - 2].x, meta.data[meta.data.length - 2].y, last.x, last.y]]
+          : [];
         ctx.font = "italic 10px system-ui";
-        ctx.fillStyle = s.color || "#dfe4ea";
-        const nameW = ctx.measureText(s.label).width;
-        const ny = last.y - 12 > ca.top + 2 ? last.y - 9 : last.y + 13;
-        if (last.x - 9 - nameW > ca.left) {
-          ctx.textAlign = "right";
-          ctx.fillText(s.label, last.x - 9, ny);
-        } else {
-          ctx.textAlign = "left";
-          ctx.fillText(s.label, last.x + 9, ny);
-        }
+        ctx.fillStyle = ds.series.color || "#dfe4ea";
+        const best = place(ds.series.label, last.x, last.y, segs);
+        ctx.fillText(ds.series.label, best.cx, best.cy);
         ctx.font = "10px system-ui";
       }
+      ctx.textBaseline = "alphabetic";
     }
 
     if (!opts.labels.length) { ctx.restore(); return; }
