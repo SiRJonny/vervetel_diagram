@@ -49,7 +49,9 @@ export function buildSeries(rows, visibleIds) {
       ? unitRows.filter((r) => r.unit || FIXED_BANDS[id])
       : unitRows;
     if (!list.length) continue;
-    // reference interval from the most recent row
+    // reference interval from the most recent row that carries one — the
+    // newest report row may be a value without a range, and a chip must
+    // not end up with an empty chart in that case
     const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const latest = sorted[sorted.length - 1];
 
@@ -57,13 +59,19 @@ export function buildSeries(rows, visibleIds) {
     // 0-min fallback for one-sided references ("< x"); fixed band where the
     // reports only ever give "> x" (eGFR, HDL)
     const fixed = FIXED_BANDS[id];
-    let sLo = latest.refLowN, sHi = latest.refHighN;
+    let sLo, sHi, oneSided = false;
     if (fixed) {
       sLo = fixed.lo;
       sHi = fixed.hi;
     } else {
-      if (sLo === null && sHi !== null) sLo = 0;
-      if (sLo === null || sHi === null || sHi <= sLo) continue; // not plottable
+      const refRows = sorted.filter(
+        (r) => r.refHighN !== null && r.refHighN > (r.refLowN ?? 0));
+      if (!refRows.length) continue; // not plottable
+      const refLatest = refRows[refRows.length - 1];
+      sLo = refLatest.refLowN;
+      sHi = refLatest.refHighN;
+      if (sLo === null && sHi !== null) { sLo = 0; oneSided = true; }
+      if (sLo === null || sHi === null || sHi <= sLo) continue;
     }
 
     const y = (v) => BAND_LOW + ((v - sLo) / (sHi - sLo)) * (BAND_HIGH - BAND_LOW);
@@ -84,7 +92,6 @@ export function buildSeries(rows, visibleIds) {
 
     const units = [...new Set(list.map((r) => r.unit).filter(Boolean))];
     const unitStr = units[0] ? " " + units[0] : "";
-    const oneSided = !fixed && latest.refLowN === null;
     // hard guard: a series with contradictory units must never be drawn
     if (units.length > 1) continue;
     series.push({
