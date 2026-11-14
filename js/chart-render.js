@@ -28,6 +28,13 @@ function isoDate(ts) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Compact x-tick label for portrait: "24.11" — full ISO dates would overlap
+// when many datapoints exist; day precision stays available in the tooltip.
+function shortDate(ts) {
+  const d = new Date(ts);
+  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 // Build normalized chart series from enriched, persisted rows.
 // rows already have: analyteId, analyteLabel, value, refLowN, refHighN, unit, date, bound
 export function buildSeries(rows, visibleIds) {
@@ -266,10 +273,12 @@ export function renderChart(canvas, series) {
           type: "linear",
           ticks: {
             color: "#8b94a3",
-            callback: (v) => isoDate(v),
+            callback: isPortrait ? shortDate : isoDate,
             maxRotation: 0,
             autoSkip: true,
-            maxTicksLimit: 12,
+            // portrait: compact YY.MM labels, fewer of them — they would
+            // overlap when many datapoints exist
+            maxTicksLimit: isPortrait ? 6 : 12,
           },
           // place a tick at every datapoint date, no dates in between
           afterBuildTicks: (axis) => {
@@ -287,7 +296,8 @@ export function renderChart(canvas, series) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: () => "", // the date is on the x axis already — value only
+            // exact date here — portrait ticks show only YY.MM
+            title: (items) => items.length ? items[0].raw.raw.date : "",
             label: (item) => {
               const raw = item.raw.raw;
               const s = item.dataset.series;
