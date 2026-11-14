@@ -8,7 +8,7 @@
 // Clicking/tapping a plot line selects that series: the dashed band lines
 // are annotated with its interval values and its name shows top-right.
 
-import { unitAllowed, FIXED_BANDS } from "./normalize.js";
+import { unitAllowed, FIXED_BANDS, DATA_BANDS } from "./normalize.js";
 
 export const BAND_LOW = 0.2;
 export const BAND_HIGH = 0.8;
@@ -66,12 +66,22 @@ export function buildSeries(rows, visibleIds) {
     } else {
       const refRows = sorted.filter(
         (r) => r.refHighN !== null && r.refHighN > (r.refLowN ?? 0));
-      if (!refRows.length) continue; // not plottable
-      const refLatest = refRows[refRows.length - 1];
-      sLo = refLatest.refLowN;
-      sHi = refLatest.refHighN;
-      if (sLo === null && sHi !== null) { sLo = 0; oneSided = true; }
-      if (sLo === null || sHi === null || sHi <= sLo) continue;
+      if (!refRows.length && DATA_BANDS[id]) {
+        // no lab range anywhere — scale by the data's own min/max for now
+        const vals = sorted.map((r) => r.value)
+          .filter((v) => v !== null && Number.isFinite(v));
+        if (!vals.length) continue;
+        sLo = Math.min(...vals);
+        sHi = Math.max(...vals);
+        if (sHi <= sLo) sHi = sLo + Math.max(Math.abs(sLo) * 0.1, 1);
+      } else {
+        if (!refRows.length) continue; // not plottable
+        const refLatest = refRows[refRows.length - 1];
+        sLo = refLatest.refLowN;
+        sHi = refLatest.refHighN;
+        if (sLo === null && sHi !== null) { sLo = 0; oneSided = true; }
+        if (sLo === null || sHi === null || sHi <= sLo) continue;
+      }
     }
 
     const y = (v) => BAND_LOW + ((v - sLo) / (sHi - sLo)) * (BAND_HIGH - BAND_LOW);
@@ -145,7 +155,7 @@ const refBandPlugin = {
         ctx.fillText(fmt(s.refLow) + unit, cx, yLow + 11);
         ctx.fillText(fmt(s.refHigh) + unit, cx, yHigh - 3);
         ctx.textAlign = "right";
-        ctx.fillStyle = "rgba(139,148,163,0.9)";
+        ctx.fillStyle = s.color || "rgba(139,148,163,0.9)";
         ctx.font = "italic 10px system-ui";
         ctx.fillText(s.label, ca.right - 4, ca.top + 10);
       }

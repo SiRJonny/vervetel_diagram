@@ -307,6 +307,14 @@ export const FIXED_BANDS = {
   hdl: { lo: 1.05, hi: 1.55 },
 };
 
+// Analytes with no lab range in any document (user decision, 2026-11):
+// until a real range is chosen, the chart band falls back to the data's
+// own min/max values so the series is visible at all.
+export const DATA_BANDS = {
+  estradiol: true,
+  progesterone: true,
+};
+
 // Stable color per analyte.
 const PALETTE = [
   "#ff5d5d", "#4da3ff", "#5ddba4", "#f5c451", "#b07dff",
