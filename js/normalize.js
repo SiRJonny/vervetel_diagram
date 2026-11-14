@@ -21,7 +21,8 @@ const ANALYTES = [
   ["hemoglobin", "Hemoglobin", [/\bhemoglobin\b/, /\bhb\b/]],
   // sed-rate must be matched before plain erythrocytes ("Vörösvérsejt süllyedés")
   ["sed-rate", "Vörösvérsejt süllyedés", [
-    /\bvorosversejt sullyedes\b/, /\bvorosvertest sullyedes\b/]],
+    /\bvorosversejt sullyedes\b/, /\bvorosvertest sullyedes\b/,
+    /\bsullyedes\b/, /\bwe\b/]],
   ["leukocytes", "Fehérvérsejt", [
     /\bfeherversejt(szam|szamzam|szabszam)?\b/, /\bfeherversejt szam\b/,
     /\bfeherversejt \(abszolut\)\b/, /\bwbc\b/, /\bleukocita\b/]],
@@ -73,7 +74,7 @@ const ANALYTES = [
   ["bilirubin-total", "Totál bilirubin", [/\btotal bilirubin\b/]],
   ["bilirubin-direct", "Direkt/konjug. bilirubin", [
     /\bdirekt bilirubin\b/, /\bkonjugalt bilirubin\b/]],
-  ["glucose", "Glükóz", [/\bglukoz\b/]],
+  ["glucose", "Glükóz", [/\bglukoz\b/, /\bvercukor\b/]],
   ["crp", "CRP", [/\bc reaktiv protein\b/, /\bcrp\b/, /\bhs-crp\b/]],
   ["albumin", "Albumin", [/\balbumin\b/]],
   ["total-protein", "Összfehérje", [/\bosszfeherje\b/]],
@@ -85,6 +86,22 @@ const ANALYTES = [
   ["amylase", "Amiláz", [/\bamilaz\b/]],
   ["ck", "Kreatin kináz", [/\bkreatin kinaz\b/, /\bck\b/]],
   ["psa", "PSA", [/\bprosztata specifikus antig\b/, /\bpsa\b/]],
+  // free testosterone / T3/T4 must match before the generic hormone names
+  ["testosterone-free", "Tesztoszteron szabad", [
+    /\btesztoszteron szabad\b/, /\bfree tesztoszteron\b/]],
+  ["testosterone", "Tesztoszteron", [/\btesztoszteron\b/]],
+  ["prolactin", "Prolaktin", [/\bprolaktin\b/, /\bprolactin\b/, /\bprl\b/]],
+  ["estradiol", "Ösztradiol", [/\bosztradiol\b/, /\bestztradiol\b/]],
+  ["progesterone", "Progeszteron", [/\bprogeszteron\b/]],
+  ["shbg", "SHBG", [/\bshbg\b/, /\bsex hormon koto feherje\b/]],
+  ["dhea-s", "DHEA-S", [/\bdhea\b/]],
+  ["d-vitamin", "D-vitamin", [
+    /\bd vitamin\b/, /\b25-oh d\b/, /\bd3 vitamin\b/, /\b25oh-?d3?-? ?vitamin\b/]],
+  ["parathormon", "Parathormon", [/\bparathormon\b/, /\bpth\b/]],
+  ["free-t4", "Szabad T4", [/\bszabad t4\b/, /\bfree t4\b/, /\bft4\b/]],
+  ["free-t3", "Szabad T3", [/\bszabad t3\b/, /\bfree t3\b/, /\bft3\b/]],
+  ["b12", "B12 vitamin", [/\bb12 vitamin\b/, /\bb12\b/]],
+  ["folate", "Fólsav", [/\bfolsav\b/]],
   ["tsh", "TSH", [/\btireoidea stimulalo hormon\b/, /\btsh\b/]],
   ["alp", "Alkalikus foszfatáz", [/\balkalikus foszfataz\b/]],
   ["ldh", "LDH", [/\blaktat dehidrogenaz\b/, /\bldh\b/]],
@@ -100,6 +117,8 @@ const UNIT_MAP = [
   [/^ml\/min(\/1[.,]73\s*m2)?$/i, "mL/min"], // eGFR: mL/min/1.73m2 → mL/min
   [/^mm\/(ora|óra)$/i, "mm/h"],
   [/^giga$/i, "G/L"],
+  // TSH international unit in Hungarian lab notation (mNE/L = mIU/L)
+  [/^mne\/l$/i, "mIU/L"],
 ];
 
 export function normalizeUnit(unit) {
@@ -165,6 +184,9 @@ export const GROUPS = [
   ]],
   ["inflammation-hormones", "Gyulladás és hormon", [
     "crp", "sed-rate", "tsh", "psa",
+    "prolactin", "estradiol", "progesterone",
+    "testosterone", "testosterone-free", "shbg", "dhea-s",
+    "d-vitamin", "parathormon", "free-t4", "free-t3", "b12", "folate",
   ]],
 ];
 
@@ -214,6 +236,19 @@ export const EXPECTED_UNITS = {
   tfsat: ["%"],
   ferritin: ["µg/L"], psa: ["µg/L"],
   tsh: ["mIU/L"],
+  prolactin: ["µg/L", "mIU/L"],
+  testosterone: ["µg/L", "nmol/L"],
+  "testosterone-free": ["ng/L", "pmol/L"],
+  estradiol: ["pg/ml", "pmol/L"],
+  progesterone: ["ng/ml", "nmol/L"],
+  shbg: ["nmol/L"],
+  "dhea-s": ["µmol/L"],
+  "d-vitamin": ["nmol/L", "ng/ml", "µg/L"],
+  parathormon: ["pg/ml", "pmol/L"],
+  "free-t4": ["pmol/L", "ng/L"],
+  "free-t3": ["pmol/L", "pg/ml"],
+  b12: ["pmol/L", "pg/ml"],
+  folate: ["nmol/L", "µg/L"],
   "sed-rate": ["mm/h"],
   "hba1c-ifcc": ["mmol/mol"],
   "hba1c-pct": ["%"],

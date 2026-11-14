@@ -1,6 +1,6 @@
 ﻿// pdf-parse.js — in-browser PDF lab report parsing (JS port of
 // scripts/extract_pdf_data.py). Uses pdf.js (bundled locally, offline).
-// Handles the Corden and SYNLAB Hungarian lab layouts.
+// Handles the Corden, SYNLAB, EESZT/LOINC and Semmelweis "LELET" layouts.
 
 // Worker path for the browser (vendored UMD). Tests may pre-set
 // GlobalWorkerOptions.workerSrc before importing this module.
@@ -35,6 +35,9 @@ const FOOTER_KEYWORDS = [
   "budapest", "ajka", "székesfehérvár", "dunaújváros", "kiskunhalas",
   "weiss manfréd", "korányi", "seregélyesi", "monszpart", "vizelet általános",
   "megj.", "eeszt", "renderel", "létrehozás", "kiadás", "generált",
+  // street keywords kill wrapped address lines whose "Lakcím:" label sat
+  // on the previous line
+  "utca", "nyomtatva", "e-medsolution",
 ];
 
 // ---------------------------------------------------------------- helpers --
@@ -42,6 +45,10 @@ const FOOTER_KEYWORDS = [
 function isFooter(line) {
   const low = line.toLowerCase();
   if (FOOTER_KEYWORDS.some((k) => low.includes(k))) return true;
+  // wrapped street-address lines ("Xyz u. 2") — never result rows
+  if (/^[A-ZÁÉÍÓÖŐÚÜŰ][\p{L}]+ (?:u\.?|utca|út|körút|tér)[\s\d]/u.test(line)) {
+    return true;
+  }
   return line.startsWith("•") || line.startsWith("\uFFFD");
 }
 
@@ -160,7 +167,13 @@ function parseCorden(lines) {
     let flag = "";
     while (after.length && FLAGS.has(after[0])) flag = after.shift();
     const unit = after.length ? after.shift() : "";
-    let refText = cleanRefText(after).replace(/\s*Valid$/, "");
+    // status column junk after the reference: "Valid K" (validator initials)
+    // or the validator's name ("Pálinkás Dr.") — trailing non-numeric tokens
+    // are never part of the interval
+    while (after.length && !/^[<>]?[\d.,]+$/.test(after[after.length - 1])) {
+      after.pop();
+    }
+    let refText = cleanRefText(after);
     const bm = REF_BOUND_RE.exec(refText);
     if (bm) refText = (bm[1] + " " + toNum(bm[2])).trim();
     rows.push(makeRow(date, name, result, unit, refText, flag, false));
@@ -174,6 +187,10 @@ const SYNLAB_DATE_RE = /Mintavétel:\s*([\d.]+)/;
 // pdf.js splits the date onto its own line ("2026.01.26 2026.01.26 00:00");
 // the first date is the sample collection time.
 const SYNLAB_DATE_LINE_RE = /^(\d{4}\.\d{2}\.\d{2})\s+\d{4}\.\d{2}\.\d{2}/;
+// patient/lab metadata lines ("Lakcím: …", "TAJ/ID: …") — never measurements;
+// wraps of these lines are killed by FOOTER_KEYWORDS ("utca")
+const SYNLAB_HEADER_RE =
+  /^(?:Név|Azonosító|Sorszám|Születési|Lakcím|Cím|Cim|TAJ|Páciens|Beküldő|Orvos|Továbbító|Ellátó|Ellátás|Intézmény|Térítési|Téritési|Napló|Státusz|Minősítés|Mértékegység|Referencia\*?|Validál|ENDOKRINOLÓGIA|HEMATOLÓGIA|HEMOSZTÁZIS|KLINIKAI|SZEROLÓGIA|VIZSGÁLATOK|ÁLTALÁNOS)\b/i;
 
 function parseSynlab(lines) {
   let date = "";
@@ -187,6 +204,7 @@ function parseSynlab(lines) {
     const dl = SYNLAB_DATE_LINE_RE.exec(line);
     if (dl) { date = dl[1].replace(/\./g, "-"); continue; }
     if (isFooter(line)) continue;
+    if (SYNLAB_HEADER_RE.test(line)) continue;
     const tokens = line.split(/\s+/);
 
     // locate result: "<" / ">" operator + number, or bare number token
@@ -197,7 +215,13 @@ function parseSynlab(lines) {
         idx = i + 1; opIndex = i; prefix = t[0];
         break;
       }
-      if (NUM_PREFIXED_RE.test(t)) { idx = i; break; }
+      if (NUM_PREFIXED_RE.test(t)) {
+        // "Prolaktin (PRL) 60 perc 235.3 mIU/L": a number directly followed
+        // by "perc" is a timing qualifier inside the name, not the result
+        if (/^perc$/i.test(tokens[i + 1] || "")) { i += 1; continue; }
+        idx = i;
+        break;
+      }
     }
 
     if (idx === null) {
@@ -269,6 +293,53 @@ function parseSynlab(lines) {
         result, unit, refText, flag, true));
     }
     pendingName = "";
+  }
+  return rows;
+}
+
+// ------------------------------------------------------------- Semmelweis ----
+// Clinic letterhead "LELET" (e.g. Asszisztált Reprodukció): patient header,
+// then after "Eredmény:" a loose value list without reference intervals:
+//   Eredmény:
+//   Ösztradiol meghat. 201 pg/ml
+//   2026.02.02            <- date line applies to the rows above it
+//   00000473              <- standalone code line, ignored
+
+const LELET_DETECT_RE = /Beteg neve|Anyja neve/;
+
+function parseLelet(lines) {
+  const rows = [];
+  let started = false;
+  let date = "";
+  let batch = []; // rows awaiting the date line that follows them
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!started) {
+      if (/^eredmény:?$/i.test(line)) started = true;
+      continue; // letterhead + patient header (name, TAJ, address) — never rows
+    }
+    if (isFooter(line)) continue;
+    const dm = /^(\d{4}\.\d{2}\.\d{2})$/.exec(line);
+    if (dm) {
+      date = dm[1].replace(/\./g, "-");
+      for (const r of batch) if (!r.date) r.date = date;
+      batch = [];
+      continue;
+    }
+    if (/^[-_ ]+$/.test(line)) continue;
+    if (/^egység$/i.test(line) || /^térítési/i.test(line)) continue;
+    if (/^\d{4,}$/.test(line)) continue; // standalone result/case codes
+    const tokens = line.split(/\s+/);
+    // value line: <name> <number> <unit> — the unit guard rejects header noise
+    const idx = tokens.findIndex((t) => NUM_RE.test(t));
+    if (idx <= 0 || idx === tokens.length - 1) continue;
+    const unit = tokens[idx + 1];
+    if (!isUnitToken(unit)) continue;
+    const name = tokens.slice(0, idx).join(" ").replace(/[.:,]+$/, "");
+    const row = makeRow(date, name, toNum(tokens[idx]), unit, "", "", false);
+    rows.push(row);
+    batch.push(row);
   }
   return rows;
 }
@@ -348,7 +419,8 @@ function parseEeszt(lines) {
     pendingName = "";
     const result = toNum(tokens[idx]);
     const after = tokens.slice(idx + 1);
-    // strip trailing status word
+    // strip trailing status: "VALIDÁLT (1)" — validation count after the word
+    while (after.length && /^\(\d\)$/.test(after[after.length - 1])) after.pop();
     while (after.length && /^(valid|validált)$/i.test(after[after.length - 1])) {
       after.pop();
     }
@@ -364,6 +436,8 @@ function parseEeszt(lines) {
     }
     // reference may repeat the unit ("136.00 - 177.00 g/L")
     if (after.length && isUnitToken(after[after.length - 1])) after.pop();
+    // "27 pg alacsony 28 - 33 pg": flag sits inside the reference tokens
+    if (!flag && after.length && EESZT_FLAGS.has(after[0])) flag = after.shift();
     const refText = cleanRefText(after);
     rows.push(makeRow(date, name, result, unit, refText, flag, false));
   }
@@ -410,12 +484,23 @@ export async function parsePdfFile(arrayBuffer, fileName) {
     if (i === 1) firstPage = extractLines(tc).join("\n");
     allLines.push(...extractLines(tc));
   }
-  const fmt = firstPage.includes("Synlab") ? "synlab"
-    : firstPage.includes("LOINC") ? "eeszt" : "corden";
+  // Detection order matters: Synlab-hosted EESZT reports say
+  // "Név: Synlab Hungary …" in their metadata, so LOINC must win over Synlab;
+  // "Beteg neve" identifies the Semmelweis letterhead format.
+  const fmt = LELET_DETECT_RE.test(firstPage) ? "lelet"
+    : firstPage.includes("LOINC") ? "eeszt"
+    : firstPage.includes("Synlab") ? "synlab" : "corden";
   const parser = fmt === "synlab" ? parseSynlab
-    : fmt === "eeszt" ? parseEeszt : parseCorden;
+    : fmt === "eeszt" ? parseEeszt
+    : fmt === "lelet" ? parseLelet : parseCorden;
+  // Phase/reference-table label rows ("Menopauza után :", "Follikuláris
+  // fázis :" printed under an analyte as its phase-specific intervals) and
+  // datetime fragments are never measurements.
+  const JUNK_NAME_RE =
+    /:\s*$|\b(?:hiány|elégtelen|megfelelő|stimuláció után)\b|\b\d{4}-\d{2}-\d{2}\b/i;
   const rows = parser(allLines)
-    .filter((r) => r.test && r.result !== undefined);
+    .filter((r) => r.test && r.result !== undefined)
+    .filter((r) => !JUNK_NAME_RE.test(r.test));
   rows.forEach((r) => { r.file = fileName; });
   return rows;
 }
