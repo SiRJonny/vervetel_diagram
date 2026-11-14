@@ -1,5 +1,5 @@
 // ui.js — analyte selection panel. Desktop: vertical checkbox list.
-// Mobile (<=820px): same elements become a horizontal chip scroller (CSS).
+// Mobile (portrait): same elements become a horizontal chip scroller (CSS).
 
 import { analyteColor, analyteLabel, GROUPS, analyteGroup } from "./normalize.js";
 import { analyteDescription } from "./descriptions.js";

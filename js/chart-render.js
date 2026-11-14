@@ -4,7 +4,7 @@
 // (refLow..refHigh) maps onto a fixed common band (BAND_LOW..BAND_HIGH)
 // on the shared y axis. Two dashed horizontal lines mark that band.
 // Each series' actual interval values are shown as colored labels on the
-// right edge (desktop only; mobile users tap a point for the tooltip).
+// right edge (landscape only; portrait users tap a point for the tooltip).
 // Clicking/tapping a plot line selects that series: the dashed band lines
 // are annotated with its interval values and its name shows top-right.
 
@@ -213,10 +213,11 @@ export function renderChart(canvas, series) {
 
   const labels = series.map((s) => ({ color: s.color, text: s.refLabel }));
 
-  // Mobile: no right-edge interval labels (they eat too much width);
-  // users tap a point and the tooltip shows the reference interval.
-  const isMobile = window.matchMedia("(max-width: 820px)").matches;
-  const drawnLabels = isMobile ? [] : labels;
+  // Portrait layout (any screen taller than wide): no right-edge interval
+  // labels (they eat too much width); users tap a point and the tooltip
+  // shows the reference interval.
+  const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+  const drawnLabels = isPortrait ? [] : labels;
 
   // x ticks only at actual datapoint dates (union across visible series)
   const pointDates = [...new Set(
@@ -224,7 +225,7 @@ export function renderChart(canvas, series) {
   )].sort((a, b) => a - b);
 
   // Reserve space on the right so the interval labels never get clipped.
-  const rightPad = isMobile ? 8
+  const rightPad = isPortrait ? 8
     : Math.min(200, Math.max(96, Math.round(
         Math.max(10, ...labels.map((l) => l.text.length)) * 7.2) + 18));
 

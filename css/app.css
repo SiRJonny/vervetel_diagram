@@ -210,11 +210,11 @@ footer.note a { color: var(--muted); }
   pointer-events: none;
 }
 
-/* Desktop: the count is mobile-only, head is not a toggle */
+/* Landscape/desktop: the count is portrait-only, head is not a toggle */
 #sel-count { display: none; }
 
-/* Mobile: chart on top, collapsible compact chip panel below */
-@media (max-width: 820px) {
+/* Portrait (any screen taller than wide): chart on top, collapsible compact chip panel below */
+@media (orientation: portrait) {
   main {
     grid-template-columns: 1fr;
     grid-template-areas: "chart" "panel";

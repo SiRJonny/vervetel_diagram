@@ -100,6 +100,11 @@ document.querySelector(".panel-head").addEventListener("click", () => {
   document.getElementById("analyte-panel").classList.toggle("collapsed");
 });
 
+// Portrait/landscape flip changes the label layout (which edge labels are
+// drawn, reserved padding) — rebuild the chart so it matches the new shape.
+window.matchMedia("(orientation: portrait)").addEventListener("change",
+  () => refresh());
+
 // Wipes the local IndexedDB (results + settings). Irreversible — the browser
 // copy is gone; re-import PDFs or import a JSON export to restore.
 document.getElementById("delete-data").addEventListener("click", async () => {
