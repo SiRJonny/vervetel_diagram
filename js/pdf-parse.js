@@ -160,6 +160,21 @@ function parseCorden(lines) {
     const name = rm[1].trim().replace(CORDEN_CODE_RE, "");
     if (CORDEN_HEADER_RE.test(name)) continue;
     const tokens = rm[2].trim().split(/\s+/);
+
+    // qualitative result ("Neg Leu/uL < 15", "Negatív"): word value before
+    // any number — the number after it belongs to the reference, not the result
+    const w = tokens.findIndex((t) =>
+      /^(?:neg(?:at(í|i)v(?:e)?)?|pozit(í|i)v|posit(í|i)v|norm(á|a)lis)$/i.test(t));
+    const numIdx = tokens.findIndex((t) => NUM_RE.test(t));
+    if (w !== -1 && (numIdx === -1 || w < numIdx)) {
+      const unit = tokens[w + 1] && isUnitToken(tokens[w + 1]) ? tokens[w + 1] : "";
+      let qref = cleanRefText(tokens.slice(w + 1 + (unit ? 1 : 0)));
+      const qbm = REF_BOUND_RE.exec(qref);
+      if (qbm) qref = (qbm[1] + " " + toNum(qbm[2])).trim();
+      rows.push(makeRow(date, name, tokens[w], unit, qref, "", false));
+      continue;
+    }
+
     const idx = tokens.findIndex((t) => NUM_RE.test(t));
     if (idx === -1) continue;
     const result = toNum(tokens[idx]);

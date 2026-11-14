@@ -19,12 +19,14 @@ function collectAnalytes(rows) {
   for (const r of rows) {
     if (!r.analyteId) continue;
     if (!map.has(r.analyteId)) {
-      map.set(r.analyteId, { label: r.analyteLabel, count: 0, plottable: true });
+      map.set(r.analyteId, { label: r.analyteLabel, count: 0, plottable: false });
     }
     const a = map.get(r.analyteId);
     a.count++;
-    // Plottable needs a numeric max; min may fall back to 0.
-    if (r.refHighN === null || r.refHighN <= (r.refLowN ?? 0)) a.plottable = false;
+    // Plottable = at least one row has a numeric max greater than its min
+    // (stray unparseable rows, e.g. qualitative urine lines, must not grey
+    // out an analyte whose other rows chart fine).
+    if (r.refHighN !== null && r.refHighN > (r.refLowN ?? 0)) a.plottable = true;
   }
   return map;
 }
