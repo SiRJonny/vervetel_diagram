@@ -7,6 +7,12 @@
   main { display: grid; grid-template-columns: 1fr 280px; gap: 1rem; padding: 0 1.2rem 1rem; align-items: start; }
   #chart-wrap { position: relative; background: #1d222b; border: 1px solid #2b323e;
     border-radius: 10px; height: min(70vh, 560px); padding: 1rem; }
+  /* portrait: stack like the real app.css — chart gets nearly full width */
+  @media (orientation: portrait) {
+    main { grid-template-columns: 1fr; padding: 0 0.5rem 0.5rem; }
+    #chart-wrap { height: min(45vh, 380px); padding: 0.5rem; }
+    main > :not(#chart-wrap) { display: none; }
+  }
   body { margin: 0; background: #14171c; }
   header { padding: 0.8rem 1.2rem; color: #dfe4ea; font-family: system-ui; }
 </style>
