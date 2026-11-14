@@ -30,7 +30,8 @@
   ];
   const { buildSeries, renderChart } = await import("./js/chart-render.js");
   const series = buildSeries(rows, new Set(["a", "b", "c"]));
-  series.forEach((s) => { s.color = "#e3b341"; });
+  const colors = { a: "#e3b341", b: "#4da3ff", c: "#66d17f" };
+  series.forEach((s) => { s.color = colors[s.id] || "#e3b341"; });
   window.__chart = renderChart(document.getElementById("chart"), series);
 </script>
 </body>

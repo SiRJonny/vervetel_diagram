@@ -168,6 +168,47 @@ const refBandPlugin = {
       }
     }
 
+    // few series (3 or less): label every marker with its value and put the
+    // series name next to the last marker — with so few lines there is
+    // room, and it spares the user from hovering each point
+    if (chart.data.datasets.length <= 3) {
+      ctx.font = "10px system-ui";
+      for (let i = 0; i < chart.data.datasets.length; i++) {
+        const ds = chart.data.datasets[i];
+        const meta = chart.getDatasetMeta(i);
+        if (!meta || !meta.data.length) continue;
+        const s = ds.series;
+        ctx.fillStyle = s.color || "#dfe4ea";
+        for (let k = 0; k < meta.data.length; k++) {
+          const el = meta.data[k];
+          const row = ds.data[k].raw;
+          if (!el || row.value === null || row.value === undefined) continue;
+          const text = (row.bound || "") + fmt(row.value);
+          if (el.x > ca.right - ctx.measureText(text).width - 12) {
+            ctx.textAlign = "right";
+            ctx.fillText(text, el.x - 7, el.y + 3.5);
+          } else {
+            ctx.textAlign = "left";
+            ctx.fillText(text, el.x + 7, el.y + 3.5);
+          }
+        }
+        // series name at the last marker, above it (below when clipped)
+        const last = meta.data[meta.data.length - 1];
+        ctx.font = "italic 10px system-ui";
+        ctx.fillStyle = s.color || "#dfe4ea";
+        const nameW = ctx.measureText(s.label).width;
+        const ny = last.y - 12 > ca.top + 2 ? last.y - 9 : last.y + 13;
+        if (last.x - 9 - nameW > ca.left) {
+          ctx.textAlign = "right";
+          ctx.fillText(s.label, last.x - 9, ny);
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(s.label, last.x + 9, ny);
+        }
+        ctx.font = "10px system-ui";
+      }
+    }
+
     if (!opts.labels.length) { ctx.restore(); return; }
 
     // per-series interval labels, stacked on the right edge
