@@ -132,8 +132,23 @@ const refBandPlugin = {
   afterDatasetsDraw(chart, args, opts) {
     const { ctx, chartArea: ca, scales: { y } } = chart;
     if (!y || !opts || !opts.labels) return;
+    // portrait canvases get doubled fonts (phone screens are dense)
+    const FS = opts.fontScale || 1;
     const yLow = y.getPixelForValue(BAND_LOW);
     const yHigh = y.getPixelForValue(BAND_HIGH);
+
+    // dark outline behind drawn text: labels over lines/other labels stay
+    // legible (needed most on portrait where fonts are doubled and space
+    // is tight)
+    const haloFill = (text, cx, cy) => {
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineWidth = Math.max(2, 3 * FS);
+      ctx.strokeStyle = "rgba(13,17,23,0.85)";
+      ctx.strokeText(text, cx, cy);
+      ctx.restore();
+      ctx.fillText(text, cx, cy);
+    };
 
     ctx.save();
     // dashed common interval lines
@@ -155,16 +170,16 @@ const refBandPlugin = {
       const s = chart.data.datasets[sel]?.series;
       if (s) {
         const cx = (ca.left + ca.right) / 2;
-        ctx.font = "13px system-ui";
+        ctx.font = `${13 * FS}px system-ui`;
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(223,228,234,0.9)";
         const unit = s.unit ? " " + s.unit : "";
-        ctx.fillText(fmt(s.refLow) + unit, cx, yLow + 13);
-        ctx.fillText(fmt(s.refHigh) + unit, cx, yHigh - 5);
+        haloFill(fmt(s.refLow) + unit, cx, yLow + 13 * FS);
+        haloFill(fmt(s.refHigh) + unit, cx, yHigh - 5 * FS);
         ctx.textAlign = "right";
         ctx.fillStyle = s.color || "rgba(139,148,163,0.9)";
-        ctx.font = "italic 13px system-ui";
-        ctx.fillText(s.label, ca.right - 4, ca.top + 14);
+        ctx.font = `italic ${13 * FS}px system-ui`;
+        ctx.fillText(s.label, ca.right - 4, ca.top + 14 * FS);
       }
     }
 
@@ -172,7 +187,9 @@ const refBandPlugin = {
     // series name next to the last marker — with so few lines there is
     // room, and it spares the user from hovering each point
     if (chart.data.datasets.length <= 3) {
-      ctx.font = "10px system-ui";
+      // portrait doubles these fonts too (labels are tiny otherwise)
+      const fs = opts.fontScale || 1;
+      ctx.font = `${10 * fs}px system-ui`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       // occupied space: every marker blocks its surroundings
@@ -194,25 +211,38 @@ const refBandPlugin = {
         t = Math.max(0, Math.min(1, t));
         return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
       };
-      const place = (text, x, y, segs) => {
+      const place = (text, x, y, segs, maxRing = 1) => {
         const w = ctx.measureText(text).width;
-        const cands = DIRS.map(([dx, dy], rank) => {
-          const cx = x + dx * (dx ? 6 + w / 2 : 0);
-          const cy = y + dy * (dx ? 9 : 10);
-          const rect = { x0: cx - w / 2 - 1, y0: cy - 7, x1: cx + w / 2 + 1, y1: cy + 7 };
-          let hits = rect.x0 < ca.left - 4 || rect.x1 > ca.right + 4
-            || rect.y0 < ca.top - 4 || rect.y1 > ca.bottom + 4 ? 1 : 0;
-          let pen = 0;
-          for (const s of segs) pen += Math.max(0, 13 - ptSegDist(cx, cy, s[0], s[1], s[2], s[3]));
-          for (const r of placed) {
-            if (rect.x0 < r.x1 && r.x0 < rect.x1 && rect.y0 < r.y1 && r.y0 < rect.y1) hits++;
-          }
-          return { rank, cx, cy, pen, hits };
+        const hh = 7 * fs; // label rect half-height, scales with the font
+        // two rings of candidates: close spots first, farther ones as
+        // fallback when everything nearby is taken (dense doubled-font
+        // portrait charts need the extra room); maxRing lets names (drawn
+        // last, when everything is taken) reach farther than values
+        const cands = DIRS.flatMap(([dx, dy], dir) => {
+          const rings = [0, 1, ...(maxRing > 1 ? [2] : [])];
+          return rings.map((r) => {
+            const rank = dir * 3 + r;
+            const cx = dx ? x + dx * ((r ? (r > 1 ? 30 : 14) : 6) + w / 2) : x;
+            const cy = dx ? y + dy * (r ? (r > 1 ? 30 : 16) : 9)
+              : y + dy * ((r ? (r > 1 ? 30 : 16) : 5.5) + 7 * fs);
+            const rect = { x0: cx - w / 2 - 1, y0: cy - hh, x1: cx + w / 2 + 1, y1: cy + hh };
+            const m = 4 * fs; // bounds margin
+            // out of bounds is nearly always worse than any collision: a label
+            // that overlaps something is readable, a clipped one is not
+            let hits = rect.x0 < ca.left - m || rect.x1 > ca.right + m
+              || rect.y0 < ca.top - m || rect.y1 > ca.bottom + m ? 10 : 0;
+            let pen = 0;
+            for (const s of segs) pen += Math.max(0, 13 * fs - ptSegDist(cx, cy, s[0], s[1], s[2], s[3]));
+            for (const rr of placed) {
+              if (rect.x0 < rr.x1 && rr.x0 < rect.x1 && rect.y0 < rr.y1 && rr.y0 < rect.y1) hits++;
+            }
+            return { rank, cx, cy, pen, hits };
+          });
         }).sort((a, b) => (a.hits - b.hits) || (a.pen - b.pen) || (a.rank - b.rank));
         const best = cands[0];
         placed.push({
-          x0: best.cx - w / 2 - 1, y0: best.cy - 7,
-          x1: best.cx + w / 2 + 1, y1: best.cy + 7,
+          x0: best.cx - w / 2 - 1, y0: best.cy - hh,
+          x1: best.cx + w / 2 + 1, y1: best.cy + hh,
         });
         return best;
       };
@@ -235,7 +265,7 @@ const refBandPlugin = {
           }
           const text = (row.bound || "") + fmt(row.value);
           const best = place(text, el.x, el.y, segs);
-          ctx.fillText(text, best.cx, best.cy);
+          haloFill(text, best.cx, best.cy);
         }
       }
       for (const [ds, meta] of metas) {
@@ -243,11 +273,11 @@ const refBandPlugin = {
         const segs = meta.data.length > 1
           ? [[meta.data[meta.data.length - 2].x, meta.data[meta.data.length - 2].y, last.x, last.y]]
           : [];
-        ctx.font = "italic 10px system-ui";
+        ctx.font = `italic ${10 * fs}px system-ui`;
         ctx.fillStyle = ds.series.color || "#dfe4ea";
-        const best = place(ds.series.label, last.x, last.y, segs);
-        ctx.fillText(ds.series.label, best.cx, best.cy);
-        ctx.font = "10px system-ui";
+        const best = place(ds.series.label, last.x, last.y, segs, 2);
+        haloFill(ds.series.label, best.cx, best.cy);
+        ctx.font = `${10 * fs}px system-ui`;
       }
       ctx.textBaseline = "alphabetic";
     }
@@ -309,6 +339,10 @@ export function renderChart(canvas, series) {
   // shows the reference interval.
   const isPortrait = window.matchMedia("(orientation: portrait)").matches;
   const drawnLabels = isPortrait ? [] : labels;
+  // portrait: double the plugin-drawn fonts (marker labels, annotations) —
+  // they were unreadably small on phones. Ticks/tooltip get moderated bumps
+  // (a literal 2x there overflows a ~350px-wide phone chart).
+  const F = isPortrait ? 2 : 1;
 
   // x ticks only at actual datapoint dates (union across visible series)
   const pointDates = [...new Set(
@@ -358,11 +392,12 @@ export function renderChart(canvas, series) {
           ticks: {
             color: "#8b94a3",
             callback: isPortrait ? shortDate : isoDate,
+            font: { size: isPortrait ? 18 : 12 },
             maxRotation: 0,
             autoSkip: true,
             // portrait: compact YY.MM labels, fewer of them — they would
             // overlap when many datapoints exist
-            maxTicksLimit: isPortrait ? 6 : 12,
+            maxTicksLimit: isPortrait ? 5 : 12,
           },
           // place a tick at every datapoint date, no dates in between
           afterBuildTicks: (axis) => {
@@ -379,6 +414,9 @@ export function renderChart(canvas, series) {
       plugins: {
         legend: { display: false },
         tooltip: {
+          // portrait: readable tooltip font on dense phone screens
+          titleFont: { size: isPortrait ? 16 : 12 },
+          bodyFont: { size: isPortrait ? 16 : 12 },
           callbacks: {
             // exact date here — portrait ticks show only YY.MM
             title: (items) => items.length ? items[0].raw.raw.date : "",
@@ -390,7 +428,7 @@ export function renderChart(canvas, series) {
             },
           },
         },
-        refBand: { labels: drawnLabels, selected: selectedIdx() },
+        refBand: { labels: drawnLabels, selected: selectedIdx(), fontScale: F },
       },
     },
     plugins: [refBandPlugin],
