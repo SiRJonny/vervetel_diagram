@@ -1,7 +1,7 @@
 // import.js — load PDF / CSV / JSON files. All parsing is local.
 
 import { parsePdfFile } from "./pdf-parse.js";
-import { matchAnalyte, normalizeUnit, analyteLabel, unitAllowed } from "./normalize.js";
+import { matchAnalyte, normalizeUnit, analyteLabel, unitAllowed, convertAnalyteUnit } from "./normalize.js";
 import { saveRows, deleteFileRows, parseImportJSON, rowKey } from "./storage.js";
 
 // -- CSV -----------------------------------------------------------------
@@ -78,22 +78,38 @@ export function enrich(rows) {
       let analyteId = analyte ? analyte.id : null;
       let analyteLabelOut = analyte ? analyte.label : r.test;
       let excludedReason = "";
-      if (analyteId && num && !unitAllowed(analyteId, unit)) {
-        // e.g. a saturation % row wrongly matching a g/L analyte
-        excludedReason = `unit "${unit}" not expected for ${analyte.label}`;
+      // urine and blood are different specimens: a urine row must never
+      // become a blood value, even when the test name matches (Fehérvérsejt)
+      if (analyteId && r.urine) {
+        excludedReason = "urine specimen — kept out of blood values";
         analyteId = null;
       }
+      // convert dual-unit analytes (pmol/L → pg/mL etc.) onto the target unit
+      let conv = null;
+      if (analyteId) {
+        conv = convertAnalyteUnit(analyteId, unit);
+        if (conv === null) {
+          excludedReason = `unit "${unit}" not expected for ${analyte.label}`;
+          analyteId = null;
+        } else if (num && !unitAllowed(analyteId, conv.unit)) {
+          excludedReason = `unit "${conv.unit}" not expected for ${analyte.label}`;
+          analyteId = null;
+        }
+      }
       if (excludedReason) excluded.push({ test: r.test, reason: excludedReason });
+      const fv = conv ? conv.f : 1;
       return {
         ...r,
-        unit,
+        unit: conv ? conv.unit : unit,
         analyteId,
         analyteLabel: analyteLabelOut,
         excluded: excludedReason,
-        value: num ? num.value : null,
+        value: num ? num.value * fv : null,
         bound: num ? num.bound : "",
-        refLowN: refLow !== "" ? parseFloat(String(refLow).replace(",", ".")) : null,
-        refHighN: refHigh !== "" ? parseFloat(String(refHigh).replace(",", ".")) : null,
+        refLowN: refLow !== ""
+          ? parseFloat(String(refLow).replace(",", ".")) * fv : null,
+        refHighN: refHigh !== ""
+          ? parseFloat(String(refHigh).replace(",", ".")) * fv : null,
       };
     })
     .filter((r) => r.analyteId && r.value !== null);

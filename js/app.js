@@ -4,7 +4,7 @@ import { loadAllRows, exportJSON, clearAll } from "./storage.js";
 import { importFiles } from "./import.js";
 import { buildSeries, renderChart, setEmptyState } from "./chart-render.js";
 import { loadSelection, saveSelection, renderAnalyteList, setStatus } from "./ui.js";
-import { analyteColor } from "./normalize.js";
+import { analyteColor, FIXED_BANDS } from "./normalize.js";
 
 const canvas = document.getElementById("chart");
 const analyteList = document.getElementById("analyte-list");
@@ -23,10 +23,12 @@ function collectAnalytes(rows) {
     }
     const a = map.get(r.analyteId);
     a.count++;
-    // Plottable = at least one row has a numeric max greater than its min
-    // (stray unparseable rows, e.g. qualitative urine lines, must not grey
-    // out an analyte whose other rows chart fine).
-    if (r.refHighN !== null && r.refHighN > (r.refLowN ?? 0)) a.plottable = true;
+    // Plottable = a row with a valid numeric interval, or the analyte has a
+    // user-decided fixed band (eGFR, HDL — the PDFs only give "> x" limits).
+    if ((r.refHighN !== null && r.refHighN > (r.refLowN ?? 0))
+        || FIXED_BANDS[r.analyteId]) {
+      a.plottable = true;
+    }
   }
   return map;
 }

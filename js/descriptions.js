@@ -63,7 +63,7 @@ export const DESCRIPTIONS = {
   cholesterol:
     "Minden állati sejt membránjának építőanyaga, szteroidhormonok és epesavak előanyaga. Magas vér szintje az érelmeszesedés kockázati tényezője.",
   hdl:
-    "A „jó koleszterin”: a felesleges koleszterint a szövetekből az erek falából a májba visszaszállító lipoprotein.",
+    "A „jó koleszterin”: a felesleges koleszterint a szövetekből az erek falából a májba visszaszállító lipoprotein. Minél magasabb az értéke, annál jobb.",
   ldl:
     "A „rossz koleszterin”: koleszterint szállít a májból a szövetek felé; tartósan magas szintje érelmeszesedést, szív- és érrendszeri betegségeket okoz.",
   triglycerides:

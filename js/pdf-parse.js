@@ -143,12 +143,22 @@ const CORDEN_HEADER_RE =
 function parseCorden(lines) {
   let date = "";
   const rows = [];
+  let urine = false; // rows parsed under a urine section are never blood values
   for (let raw of lines) {
     const line = raw.trim();
     if (!line || /^[-\s]+$/.test(line)) continue;
     const dm = CORDEN_DATE_RE.exec(line);
     if (dm) { date = dm[1]; continue; }
     if (isFooter(line)) continue;
+    // WHO-coded section headers ("22550 Általános vizelet Pálinkás Dr.",
+    // "28014 Teljes vérkép ..."): no " : " value part — switch specimen context
+    if (!/:/.test(line)) {
+      const sm = /^(?:\d{4,6}[A-Z]?\s+)?(.{3,40})$/.exec(line);
+      if (sm && !/\d/.test(sm[1]) && /[A-ZÁÉÍÓÖŐÚÜŰ]/.test(sm[1])) {
+        urine = /vizelet/i.test(sm[1]);
+        continue;
+      }
+    }
     const rm = CORDEN_ROW_RE.exec(line);
     if (!rm) {
       if (rows.length && CORDEN_CONT_RE.test(line)) {
@@ -171,7 +181,9 @@ function parseCorden(lines) {
       let qref = cleanRefText(tokens.slice(w + 1 + (unit ? 1 : 0)));
       const qbm = REF_BOUND_RE.exec(qref);
       if (qbm) qref = (qbm[1] + " " + toNum(qbm[2])).trim();
-      rows.push(makeRow(date, name, tokens[w], unit, qref, "", false));
+      const qrow = makeRow(date, name, tokens[w], unit, qref, "", false);
+      qrow.urine = urine;
+      rows.push(qrow);
       continue;
     }
 
@@ -191,7 +203,9 @@ function parseCorden(lines) {
     let refText = cleanRefText(after);
     const bm = REF_BOUND_RE.exec(refText);
     if (bm) refText = (bm[1] + " " + toNum(bm[2])).trim();
-    rows.push(makeRow(date, name, result, unit, refText, flag, false));
+    const row = makeRow(date, name, result, unit, refText, flag, false);
+    row.urine = urine;
+    rows.push(row);
   }
   return rows;
 }
@@ -274,12 +288,18 @@ function parseSynlab(lines) {
     // "<"/">" prefix: belongs to the result (<7.0 mg/L, no ref) or to the
     // reference column (0.4, ref < 5.0). If a ref-like token remains
     // besides the unit, it is a reference; otherwise it is the result.
+    // Exception: the reference repeats the same bound ("eGFR-EPI >90 > 90
+    // mL/min/1.73m2") — then the prefix belongs to the result.
     let attached = "";
     if (opIndex !== null || resultToken.startsWith("<") || resultToken.startsWith(">")) {
-      const rest = after.length && isUnitToken(after[after.length - 1])
-        ? after.slice(0, -1) : after;
-      if (!rest.some((t) => NUM_RE.test(t) || REF_BOUND_RE.test(t))) {
-        attached = prefix || resultToken[0];
+      if (after.length && BOUND_OPS.has(after[0])) {
+        attached = resultToken[0];
+      } else {
+        const rest = after.length && isUnitToken(after[after.length - 1])
+          ? after.slice(0, -1) : after;
+        if (!rest.some((t) => NUM_RE.test(t) || REF_BOUND_RE.test(t))) {
+          attached = prefix || resultToken[0];
+        }
       }
     }
 
@@ -383,6 +403,7 @@ function parseEeszt(lines) {
   let date = "";
   const rows = [];
   let pendingName = "";
+  let urine = false;
   let tableStarted = false;
   for (const raw of lines) {
     const line = raw.trim();
@@ -402,9 +423,10 @@ function parseEeszt(lines) {
     if (/minta nem érkezett/i.test(line)) continue;
     let tokens = line.split(/\s+/);
 
-    // section headers between row blocks
+    // section headers between row blocks — switch the specimen context
     if (tokens.length <= 5
         && EESZT_SECTIONS.has(tokens.join(" ").toLowerCase())) {
+      urine = /vizelet/.test(tokens.join(" ").toLowerCase());
       pendingName = "";
       continue;
     }
@@ -415,8 +437,17 @@ function parseEeszt(lines) {
     if (tokens.length && LOINC_RE.test(tokens[0])) tokens = tokens.slice(1);
     if (!tokens.length) continue;
 
-    // locate result: first bare number token
-    const idx = tokens.findIndex((t) => NUM_RE.test(t));
+    // locate result: first bare number, or an operator-prefixed one
+    // (">90" = measured value above a limit, must keep its ">" bound)
+    let idx = -1, op = "";
+    for (let i = 0; i < tokens.length; i++) {
+      if (NUM_RE.test(tokens[i])) { idx = i; break; }
+      if (BOUND_OPS.has(tokens[i]) && i + 1 < tokens.length
+          && NUM_RE.test(tokens[i + 1])) {
+        idx = i + 1; op = tokens[i][0];
+        break;
+      }
+    }
     if (idx === -1) {
       // wrapped name fragment (skip balanced-paren noise like "kód (Validáló)")
       if (tokens.length <= 6
@@ -432,15 +463,20 @@ function parseEeszt(lines) {
 
     const name = joinName(pendingName, tokens.slice(0, idx).join(" ").trim());
     pendingName = "";
-    const result = toNum(tokens[idx]);
+    let result = toNum(tokens[idx]);
+    if (op) result = op + result;
     const after = tokens.slice(idx + 1);
     // strip trailing status: "VALIDÁLT (1)" — validation count after the word
     while (after.length && /^\(\d\)$/.test(after[after.length - 1])) after.pop();
     while (after.length && /^(valid|validált)$/i.test(after[after.length - 1])) {
       after.pop();
     }
-    // "eGFR 90 felett VALIDÁLT": reference only, no result — drop the row
-    if (after.length === 1 && after[0] === "felett") continue;
+    // "eGFR 90 felett VALIDÁLT": the result is a bound (">90"), not a bare
+    // number — keep it as such so the chart can place it above the limit
+    if (after.length === 1 && after[0] === "felett") {
+      result = ">" + result;
+      after.length = 0;
+    }
     let flag = "";
     if (after.length && EESZT_FLAGS.has(after[after.length - 1])) {
       flag = after.pop();
@@ -454,7 +490,9 @@ function parseEeszt(lines) {
     // "27 pg alacsony 28 - 33 pg": flag sits inside the reference tokens
     if (!flag && after.length && EESZT_FLAGS.has(after[0])) flag = after.shift();
     const refText = cleanRefText(after);
-    rows.push(makeRow(date, name, result, unit, refText, flag, false));
+    const row = makeRow(date, name, result, unit, refText, flag, false);
+    row.urine = urine;
+    rows.push(row);
   }
   return rows;
 }

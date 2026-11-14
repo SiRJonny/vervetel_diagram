@@ -8,7 +8,7 @@
 // Clicking/tapping a plot line selects that series: the dashed band lines
 // are annotated with its interval values and its name shows top-right.
 
-import { unitAllowed } from "./normalize.js";
+import { unitAllowed, FIXED_BANDS } from "./normalize.js";
 
 export const BAND_LOW = 0.2;
 export const BAND_HIGH = 0.8;
@@ -45,32 +45,46 @@ export function buildSeries(rows, visibleIds) {
     // Unitless rows are kept only when the analyte has no unit-bearing rows.
     const unitRows = allRows.filter((r) => unitAllowed(id, r.unit));
     const hasUnits = unitRows.some((r) => r.unit);
-    const list = hasUnits ? unitRows.filter((r) => r.unit) : unitRows;
+    const list = hasUnits
+      ? unitRows.filter((r) => r.unit || FIXED_BANDS[id])
+      : unitRows;
     if (!list.length) continue;
     // reference interval from the most recent row
     const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const latest = sorted[sorted.length - 1];
 
     // latest reference interval, applied to ALL points of the series;
-    // 0-min fallback for one-sided references ("< x")
+    // 0-min fallback for one-sided references ("< x"); fixed band where the
+    // reports only ever give "> x" (eGFR, HDL)
+    const fixed = FIXED_BANDS[id];
     let sLo = latest.refLowN, sHi = latest.refHighN;
-    if (sLo === null && sHi !== null) sLo = 0;
-    if (sLo === null || sHi === null || sHi <= sLo) continue; // not plottable
+    if (fixed) {
+      sLo = fixed.lo;
+      sHi = fixed.hi;
+    } else {
+      if (sLo === null && sHi !== null) sLo = 0;
+      if (sLo === null || sHi === null || sHi <= sLo) continue; // not plottable
+    }
 
     const y = (v) => BAND_LOW + ((v - sLo) / (sHi - sLo)) * (BAND_HIGH - BAND_LOW);
     const points = sorted
-      .map((r) => ({
-        x: Date.parse(r.date),
-        y: Math.min(1, Math.max(0, y(r.value))),
-        raw: r,
-      }))
+      .map((r) => {
+        // ">90" style results are drawn at a fixed representative value
+        const v = fixed && fixed.over !== undefined && r.bound === ">"
+          ? fixed.over : r.value;
+        return {
+          x: Date.parse(r.date),
+          y: Math.min(1, Math.max(0, y(v))),
+          raw: r,
+        };
+      })
       .filter((p) => !Number.isNaN(p.x))
       .sort((a, b) => a.x - b.x);
     if (!points.length) continue;
 
     const units = [...new Set(list.map((r) => r.unit).filter(Boolean))];
     const unitStr = units[0] ? " " + units[0] : "";
-    const oneSided = latest.refLowN === null;
+    const oneSided = !fixed && latest.refLowN === null;
     // hard guard: a series with contradictory units must never be drawn
     if (units.length > 1) continue;
     series.push({

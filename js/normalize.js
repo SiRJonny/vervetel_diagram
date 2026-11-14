@@ -86,9 +86,15 @@ const ANALYTES = [
   ["amylase", "Amiláz", [/\bamilaz\b/]],
   ["ck", "Kreatin kináz", [/\bkreatin kinaz\b/, /\bck\b/]],
   ["psa", "PSA", [/\bprosztata specifikus antig\b/, /\bpsa\b/]],
-  // free testosterone / T3/T4 must match before the generic hormone names
+  // 17-hydroxyprogesterone is a different hormone than progesterone —
+  // must be matched before the generic name
+  ["17-ohp", "17-OH progeszteron", [/\b17-hidroxi progeszteron\b/]],
+  // free/bioavailable testosterone must match before the generic name
   ["testosterone-free", "Tesztoszteron szabad", [
-    /\btesztoszteron szabad\b/, /\bfree tesztoszteron\b/]],
+    /\btesztoszteron szabad\b/, /\bszabad tesztoszteron\b/,
+    /\bfree tesztoszteron\b/]],
+  ["testosterone-bio", "Bioaktív tesztoszteron", [
+    /\bbioaktiv tesztoszteron\b/, /\bbioavailable tesztoszteron\b/]],
   ["testosterone", "Tesztoszteron", [/\btesztoszteron\b/]],
   ["prolactin", "Prolaktin", [/\bprolaktin\b/, /\bprolactin\b/, /\bprl\b/]],
   ["estradiol", "Ösztradiol", [/\bosztradiol\b/, /\bestztradiol\b/]],
@@ -123,10 +129,38 @@ const UNIT_MAP = [
 
 export function normalizeUnit(unit) {
   if (!unit) return "";
+  // PDFs sometimes leave trailing punctuation on the unit ("mmol/L,")
+  const u = unit.trim().replace(/[.,;:]+$/, "");
   for (const [re, canon] of UNIT_MAP) {
-    if (re.test(unit.trim())) return canon;
+    if (re.test(u)) return canon;
   }
-  return unit.trim();
+  return u;
+}
+
+// Some analytes are reported in two unit systems by different labs.
+// Everything is converted onto the target (first) unit so one series never
+// mixes scales. Factor multiplies the value (and its reference interval).
+const UNIT_SYSTEMS = {
+    // pmol/L → pg/mL (pg/mL = pmol/L ÷ 3.671)
+    estradiol: { target: "pg/ml", factors: [["pmol/l", 1 / 3.671]] },
+    // nmol/L → ng/mL (ng/mL = nmol/L ÷ 3.18)
+    progesterone: { target: "ng/ml", factors: [["nmol/l", 1 / 3.18]] },
+    // mIU/L → µg/L (µg/L = mIU/L ÷ 21.2)
+    prolactin: { target: "µg/L", factors: [["miu/l", 1 / 21.2]] },
+    // nmol/L → µg/L (µg/L = nmol/L × 0.2884)
+    testosterone: { target: "µg/L", factors: [["nmol/l", 0.2884]] },
+  };
+
+export function convertAnalyteUnit(id, unit) {
+  const sys = UNIT_SYSTEMS[id];
+  if (!sys) return { unit, f: 1 };
+  if (!unit) return { unit: sys.target, f: 1 };
+  const low = unit.trim().toLowerCase();
+  if (low === sys.target) return { unit: sys.target, f: 1 };
+  for (const [from, f] of sys.factors) {
+    if (low === from) return { unit: sys.target, f };
+  }
+  return null; // unit incompatible with the analyte
 }
 
 // Exclusion prefixes: a name starting with these is a different specimen,
@@ -185,7 +219,7 @@ export const GROUPS = [
   ["inflammation-hormones", "Gyulladás és hormon", [
     "crp", "sed-rate", "tsh", "psa",
     "prolactin", "estradiol", "progesterone",
-    "testosterone", "testosterone-free", "shbg", "dhea-s",
+    "testosterone", "testosterone-free", "testosterone-bio", "shbg", "dhea-s",
     "d-vitamin", "parathormon", "free-t4", "free-t3", "b12", "folate",
   ]],
 ];
@@ -239,8 +273,9 @@ export const EXPECTED_UNITS = {
   prolactin: ["µg/L", "mIU/L"],
   testosterone: ["µg/L", "nmol/L"],
   "testosterone-free": ["ng/L", "pmol/L"],
-  estradiol: ["pg/ml", "pmol/L"],
-  progesterone: ["ng/ml", "nmol/L"],
+  "testosterone-bio": ["nmol/L"],
+  estradiol: ["pg/ml"],
+  progesterone: ["ng/ml"],
   shbg: ["nmol/L"],
   "dhea-s": ["µmol/L"],
   "d-vitamin": ["nmol/L", "ng/ml", "µg/L"],
@@ -261,6 +296,16 @@ export function unitAllowed(id, unit) {
   if (!expected || !unit) return true;
   return expected.includes(unit);
 }
+
+// Fixed reference bands for one-sided analytes (user decision, 2026-11):
+// the reports give only "> x" limits, so a sensible fixed interval is used
+// for the band; "over"-bound values are drawn at `over` when set.
+// Shared by chart-render (band + point placement) and the analyte list
+// (an analyte with a fixed band is always plottable).
+export const FIXED_BANDS = {
+  egfr: { lo: 90, hi: 200, over: 120 },
+  hdl: { lo: 1.05, hi: 1.55 },
+};
 
 // Stable color per analyte.
 const PALETTE = [
